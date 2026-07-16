@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Чек-лист входа — пробой 1м</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --bg:#EDF0F3;
+    --surface:#FFFFFF;
+    --surface2:#F4F7F9;
+    --text:#16202B;
+    --muted:#5D6C7B;
+    --line:#D7DEE5;
+    --accent:#2E6FBF;
+    --accent-soft:#2E6FBF22;
+    --good:#1E8A5E;
+    --good-soft:#1E8A5E1A;
+    --warn:#A8721C;
+    --warn-soft:#A8721C1A;
+    --bad:#C04545;
+    --bad-soft:#C0454518;
+    --check:#FFFFFF;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0B0F14;
+      --surface:#121924;
+      --surface2:#0F151D;
+      --text:#E4EBF2;
+      --muted:#8493A3;
+      --line:#202B37;
+      --accent:#5FA8E8;
+      --accent-soft:#5FA8E82A;
+      --good:#3DBE8B;
+      --good-soft:#3DBE8B22;
+      --warn:#D9A13B;
+      --warn-soft:#D9A13B22;
+      --bad:#E36060;
+      --bad-soft:#E3606022;
+      --check:#0B0F14;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B0F14;
+    --surface:#121924;
+    --surface2:#0F151D;
+    --text:#E4EBF2;
+    --muted:#8493A3;
+    --line:#202B37;
+    --accent:#5FA8E8;
+    --accent-soft:#5FA8E82A;
+    --good:#3DBE8B;
+    --good-soft:#3DBE8B22;
+    --warn:#D9A13B;
+    --warn-soft:#D9A13B22;
+    --bad:#E36060;
+    --bad-soft:#E3606022;
+    --check:#0B0F14;
+  }
+  :root[data-theme="light"]{
+    --bg:#EDF0F3;
+    --surface:#FFFFFF;
+    --surface2:#F4F7F9;
+    --text:#16202B;
+    --muted:#5D6C7B;
+    --line:#D7DEE5;
+    --accent:#2E6FBF;
+    --accent-soft:#2E6FBF22;
+    --good:#1E8A5E;
+    --good-soft:#1E8A5E1A;
+    --warn:#A8721C;
+    --warn-soft:#A8721C1A;
+    --bad:#C04545;
+    --bad-soft:#C0454518;
+    --check:#FFFFFF;
+  }
+
+  html{background:var(--bg);}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+  }
+  main{
+    max-width:640px;
+    margin:0 auto;
+    padding:20px 16px calc(56px + env(safe-area-inset-bottom));
+  }
+
+  /* ── Header ── */
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  h1{
+    font-size:24px;
+    font-weight:700;
+    letter-spacing:-.01em;
+    text-wrap:balance;
+    margin-bottom:14px;
+  }
+  .toolbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  .dir{
+    display:inline-flex;
+    border:1px solid var(--line);
+    border-radius:8px;
+    overflow:hidden;
+    background:var(--surface);
+  }
+  .dir button{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:8px 16px;
+    background:none;
+    border:none;
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .dir button[aria-pressed="true"].long{background:var(--good-soft);color:var(--good);font-weight:700;}
+  .dir button[aria-pressed="true"].short{background:var(--bad-soft);color:var(--bad);font-weight:700;}
+  .dir button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+  .reset{
+    margin-left:auto;
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:8px 14px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--surface);
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .reset:hover{color:var(--text);border-color:var(--muted);}
+  .reset:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  /* ── Verdict (sticky) ── */
+  .verdict{
+    position:sticky;
+    top:0;
+    z-index:10;
+    background:var(--bg);
+    padding:8px 0 12px;
+  }
+  .verdict-card{
+    border:1px solid var(--line);
+    border-left:4px solid var(--muted);
+    border-radius:10px;
+    background:var(--surface);
+    padding:14px 16px;
+  }
+  .verdict-top{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .verdict-label{
+    font-family:var(--mono);
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+  .verdict-score{
+    margin-left:auto;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--muted);
+    font-variant-numeric:tabular-nums;
+  }
+  .verdict-reason{
+    font-size:13px;
+    color:var(--muted);
+    margin-top:4px;
+  }
+  .bar{
+    margin-top:10px;
+    height:6px;
+    border-radius:3px;
+    background:var(--surface2);
+    border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .bar-fill{
+    height:100%;
+    width:0%;
+    border-radius:3px;
+    background:var(--muted);
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .bar-fill{transition:width .25s ease, background-color .25s ease;}
+    .verdict-card{transition:border-color .25s ease;}
+  }
+  .verdict.neutral .verdict-label{color:var(--muted);}
+  .verdict.go .verdict-card{border-left-color:var(--good);}
+  .verdict.go .verdict-label{color:var(--good);}
+  .verdict.go .bar-fill{background:var(--good);}
+  .verdict.caution .verdict-card{border-left-color:var(--warn);}
+  .verdict.caution .verdict-label{color:var(--warn);}
+  .verdict.caution .bar-fill{background:var(--warn);}
+  .verdict.skip .verdict-card{border-left-color:var(--bad);}
+  .verdict.skip .verdict-label{color:var(--bad);}
+  .verdict.skip .bar-fill{background:var(--bad);}
+
+  /* ── Blocks ── */
+  .block{margin-top:22px;}
+  .block-title{
+    font-family:var(--mono);
+    font-size:11px;
+    font-weight:400;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .block-title::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background:var(--line);
+  }
+  .items{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .item{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:12px 14px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--surface);
+    cursor:pointer;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  .item:hover{border-color:var(--muted);}
+  .item input{
+    appearance:none;
+    -webkit-appearance:none;
+    flex:0 0 auto;
+    width:22px;
+    height:22px;
+    margin-top:1px;
+    border:2px solid var(--muted);
+    border-radius:6px;
+    background:var(--surface2);
+    cursor:pointer;
+    display:grid;
+    place-content:center;
+  }
+  .item input::after{
+    content:"✓";
+    font-family:var(--mono);
+    font-size:14px;
+    font-weight:700;
+    color:var(--check);
+    transform:scale(0);
+  }
+  .item input:checked{background:var(--accent);border-color:var(--accent);}
+  .item input:checked::after{transform:scale(1);}
+  .item input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  @media (prefers-reduced-motion: no-preference){
+    .item input::after{transition:transform .12s ease;}
+  }
+  .item-body{min-width:0;}
+  .item-name{
+    font-size:14.5px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .chip{
+    font-family:var(--mono);
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--accent);
+    background:var(--accent-soft);
+    border-radius:4px;
+    padding:2px 6px;
+  }
+  .item-sub{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-top:3px;
+    max-width:52ch;
+  }
+
+  .footnote{
+    margin-top:26px;
+    padding-top:14px;
+    border-top:1px solid var(--line);
+    font-size:12.5px;
+    color:var(--muted);
+  }
+  .footnote strong{color:var(--text);}
+</style>
+</head>
+<body>
+
+<main>
+  <p class="eyebrow">Bybit · 1м · Скальпинг · Пробой</p>
+  <h1>Чек-лист входа в сделку</h1>
+
+  <div class="toolbar">
+    <div class="dir" role="group" aria-label="Направление сделки">
+      <button type="button" class="long" id="btn-long" aria-pressed="true">Лонг</button>
+      <button type="button" class="short" id="btn-short" aria-pressed="false">Шорт</button>
+    </div>
+    <button type="button" class="reset" id="btn-reset">Сброс</button>
+  </div>
+
+  <section class="verdict neutral" id="verdict">
+    <div class="verdict-card">
+      <div class="verdict-top">
+        <span class="verdict-label" id="v-label">Отметь условия</span>
+        <span class="verdict-score" id="v-score">0 / 100 · 0 из 10</span>
+      </div>
+      <p class="verdict-reason" id="v-reason">Проходи по чек-листу сверху вниз, как смотришь график.</p>
+      <div class="bar"><div class="bar-fill" id="v-bar"></div></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 class="block-title">1 · Контекст</h2>
+    <div class="items">
+      <label class="item">
+        <input type="checkbox" data-id="htf">
+        <span class="item-body">
+          <span class="item-name">Старший ТФ не против</span>
+          <span class="item-sub">5м/15м не идут агрессивно против направления пробоя.</span>
+        </span>
+      </label>
+      <label class="item">
+        <input type="checkbox" data-id="tilt">
+        <span class="item-body">
+          <span class="item-name">Я спокоен, не тильт <span class="chip">База</span></span>
+          <span class="item-sub">Не отыгрываюсь после стопа, вхожу по плану, а не на эмоциях.</span>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 class="block-title">2 · Сетап</h2>
+    <div class="items">
+      <label class="item">
+        <input type="checkbox" data-id="flat">
+        <span class="item-body">
+          <span class="item-name">Монета во флэте</span>
+          <span class="item-sub">Чёткий диапазон, цена копит энергию, а не летит каскадом.</span>
+        </span>
+      </label>
+      <label class="item">
+        <input type="checkbox" data-id="level">
+        <span class="item-body">
+          <span class="item-name">Уровень со скопленной ликвидностью <span class="chip">База</span></span>
+          <span class="item-sub">Равные хаи/лои, за уровнем скопились стопы и лимитки.</span>
+        </span>
+      </label>
+      <label class="item">
+        <input type="checkbox" data-id="protorg">
+        <span class="item-body">
+          <span class="item-name">Есть проторговка у уровня <span class="chip">База</span></span>
+          <span class="item-sub">Плотное скопление свечей под уровнем перед пробоем.</span>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 class="block-title">3 · Подтверждение пробоя</h2>
+    <div class="items">
+      <label class="item">
+        <input type="checkbox" data-id="volume">
+        <span class="item-body">
+          <span class="item-name">Объём на пробое</span>
+          <span class="item-sub">Пробойная свеча идёт с объёмом заметно выше среднего.</span>
+        </span>
+      </label>
+      <label class="item">
+        <input type="checkbox" data-id="delta">
+        <span class="item-body">
+          <span class="item-name">Дельта / агрессия в сторону пробоя</span>
+          <span class="item-sub">В ленте агрессивные маркет-ордера по направлению сделки.</span>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 class="block-title">4 · План сделки</h2>
+    <div class="items">
+      <label class="item">
+        <input type="checkbox" data-id="nochase">
+        <span class="item-body">
+          <span class="item-name">Не догоняю цену</span>
+          <span class="item-sub">Вход после проторговки по плану, а не по вертикальной свече.</span>
+        </span>
+      </label>
+      <label class="item">
+        <input type="checkbox" data-id="stop">
+        <span class="item-body">
+          <span class="item-name">Стоп за проторговкой <span class="chip">База</span></span>
+          <span class="item-sub">Стоп стоит за проторговкой, размер посчитан до входа.</span>
+        </span>
+      </label>
+      <label class="item">
+        <input type="checkbox" data-id="exit">
+        <span class="item-body">
+          <span class="item-name">Выход спланирован</span>
+          <span class="item-sub">Лимитка на ключевом уровне; если пробой затухает — частичная фиксация.</span>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <p class="footnote"><strong>Правило:</strong> вердикт «Пропустить» — значит сделки нет, без исключений. Пункты «База» — фундамент сетапа: без любого из них вход запрещён, сколько бы галочек ни стояло.</p>
+</main>
+
+<script>
+  // ── Telegram Mini App ──
+  var tg = window.Telegram && window.Telegram.WebApp;
+  var inTg = !!(tg && tg.platform && tg.platform !== 'unknown');
+  if (inTg){
+    try{
+      tg.ready();
+      tg.expand();
+      if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+      var applyTgTheme = function(){
+        var scheme = tg.colorScheme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', scheme);
+        var bg = scheme === 'dark' ? '#0B0F14' : '#EDF0F3';
+        try{ tg.setHeaderColor(bg); tg.setBackgroundColor(bg); }catch(e){}
+      };
+      applyTgTheme();
+      tg.onEvent('themeChanged', applyTgTheme);
+    }catch(e){}
+  }
+  function hapticToggle(){
+    if (inTg && tg.HapticFeedback){ try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){} }
+  }
+  function hapticVerdict(state){
+    if (!inTg || !tg.HapticFeedback) return;
+    var kind = {go:'success', caution:'warning', skip:'error'}[state];
+    if (kind){ try{ tg.HapticFeedback.notificationOccurred(kind); }catch(e){} }
+  }
+
+  // ── Чек-лист ──
+  const ITEMS = {
+    htf:     {w:10, must:false, name:"старший ТФ"},
+    tilt:    {w:8,  must:true,  name:"состояние (тильт)"},
+    flat:    {w:10, must:false, name:"флэт"},
+    level:   {w:12, must:true,  name:"уровень с ликвидностью"},
+    protorg: {w:12, must:true,  name:"проторговка"},
+    volume:  {w:12, must:false, name:"объём"},
+    delta:   {w:10, must:false, name:"дельта"},
+    nochase: {w:6,  must:false, name:"не догонять"},
+    stop:    {w:12, must:true,  name:"стоп за проторговкой"},
+    exit:    {w:8,  must:false, name:"план выхода"}
+  };
+  const TOTAL_ITEMS = Object.keys(ITEMS).length;
+
+  const boxes = Array.from(document.querySelectorAll('.item input'));
+  const verdict = document.getElementById('verdict');
+  const vLabel = document.getElementById('v-label');
+  const vScore = document.getElementById('v-score');
+  const vReason = document.getElementById('v-reason');
+  const vBar = document.getElementById('v-bar');
+  const btnLong = document.getElementById('btn-long');
+  const btnShort = document.getElementById('btn-short');
+  let dir = 'лонг';
+  let lastState = null;
+
+  function update(){
+    let score = 0, count = 0;
+    const missingBase = [];
+    for (const box of boxes){
+      const item = ITEMS[box.dataset.id];
+      if (box.checked){ score += item.w; count++; }
+      else if (item.must){ missingBase.push(item.name); }
+    }
+
+    let state, label, reason;
+    if (count === 0){
+      state = 'neutral';
+      label = 'Отметь условия';
+      reason = 'Проходи по чек-листу сверху вниз, как смотришь график.';
+    } else if (missingBase.length > 0){
+      state = 'skip';
+      label = 'Пропустить';
+      reason = 'Нет базы сетапа: ' + missingBase.join(', ') + '.';
+    } else if (score >= 85){
+      state = 'go';
+      label = 'Вход разрешён';
+      reason = 'База и подтверждения на месте. Работай ' + dir + ' по плану.';
+    } else if (score >= 65){
+      state = 'caution';
+      label = 'Осторожно';
+      reason = 'База есть, но подтверждений мало — уменьши размер позиции.';
+    } else {
+      state = 'skip';
+      label = 'Пропустить';
+      reason = 'Слишком мало критериев — это не твой сетап.';
+    }
+
+    verdict.className = 'verdict ' + state;
+    vLabel.textContent = label;
+    vScore.textContent = score + ' / 100 · ' + count + ' из ' + TOTAL_ITEMS;
+    vReason.textContent = reason;
+    vBar.style.width = score + '%';
+
+    if (lastState !== null && state !== lastState && count > 0) hapticVerdict(state);
+    lastState = state;
+  }
+
+  boxes.forEach(b => b.addEventListener('change', () => { hapticToggle(); update(); }));
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    boxes.forEach(b => { b.checked = false; });
+    hapticToggle();
+    update();
+  });
+
+  function setDir(d){
+    dir = d;
+    btnLong.setAttribute('aria-pressed', String(d === 'лонг'));
+    btnShort.setAttribute('aria-pressed', String(d === 'шорт'));
+    hapticToggle();
+    update();
+  }
+  btnLong.addEventListener('click', () => setDir('лонг'));
+  btnShort.addEventListener('click', () => setDir('шорт'));
+
+  update();
+</script>
+</body>
+</html>
