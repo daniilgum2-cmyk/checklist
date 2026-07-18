@@ -402,6 +402,25 @@ footer {
   background: #161b22;
 }
 
+/* ---------- инструменты рисования ---------- */
+.draw-toolbar {
+  position: absolute; left: 6px; top: 34px; z-index: 6;
+  display: flex; flex-direction: column; gap: 2px;
+  background: rgba(22,27,34,0.88); border: 1px solid #30363d;
+  border-radius: 8px; padding: 4px; backdrop-filter: blur(4px);
+}
+.draw-toolbar button {
+  width: 30px; height: 30px; border: none; border-radius: 6px;
+  background: transparent; color: #8b949e; font-size: 14px;
+  cursor: pointer; line-height: 1; padding: 0;
+}
+.draw-toolbar button:hover { background: #21262d; color: #e6edf3; }
+.draw-toolbar button.active { background: rgba(31,111,235,0.25); color: #58a6ff; }
+.draw-toolbar .sep { height: 1px; background: #30363d; margin: 3px 2px; }
+@media (pointer: coarse) {
+  .draw-toolbar button { width: 38px; height: 38px; font-size: 17px; }
+}
+
 </style>
 </head>
 <body>
@@ -1036,6 +1055,532 @@ class ChartView {
 
 </script>
 <script>
+/* Инструменты рисования поверх графика (стиль TradingView):
+   курсор (выбор/перенос), линия тренда, горизонтальный уровень, линейка,
+   кисть, лонг/шорт позиция (3 клика: вход → тейк → стоп).
+   Рисунки хранятся в localStorage по символу (координаты время+цена),
+   поэтому переживают обновление свечей и видны на всех таймфреймах. */
+const DRAW_STORE = 'smc_drawings_v1';
+
+class DrawTools {
+  constructor(cv) {
+    this.cv = cv;
+    this.symbol = null;
+    this.tool = 'cursor';
+    this.items = [];
+    this.draft = null;   // создаваемый рисунок
+    this.ruler = null;   // линейка (эфемерная, не сохраняется)
+    this.sel = -1;
+    this.drag = null;
+
+    this.canvas = document.createElement('canvas');
+    Object.assign(this.canvas.style, { position: 'absolute', left: 0, top: 0, pointerEvents: 'none', zIndex: 4 });
+    cv.el.appendChild(this.canvas);
+
+    this._buildToolbar();
+
+    // перерисовываемся вместе с основным оверлеем
+    const orig = cv.draw.bind(cv);
+    cv.draw = () => { orig(); this.render(); };
+
+    cv.el.addEventListener('pointerdown', e => this._down(e), true);
+    window.addEventListener('pointermove', e => this._move(e));
+    window.addEventListener('pointerup', e => this._up(e));
+    window.addEventListener('keydown', e => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && this.sel >= 0
+          && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+        e.preventDefault();
+        this._deleteSelected();
+      }
+    });
+  }
+
+  /* ---------- панель ---------- */
+  _buildToolbar() {
+    const bar = document.createElement('div');
+    bar.className = 'draw-toolbar';
+    const tools = [
+      ['cursor', '⌖', 'Курсор — выбрать, подвинуть, отредактировать'],
+      ['trend', '╱', 'Линия тренда (протянуть)'],
+      ['hline', '─', 'Горизонтальный уровень (клик по цене)'],
+      ['ruler', '⤢', 'Линейка: измерить ход в % и барах (протянуть)'],
+      ['brush', '✎', 'Кисть (рисовать от руки)'],
+      ['pos', 'RR', 'Лонг/шорт позиция: 3 клика — вход, тейк, стоп'],
+    ];
+    this.btns = {};
+    for (const [id, glyph, title] of tools) {
+      const b = document.createElement('button');
+      b.textContent = glyph;
+      b.title = title;
+      b.addEventListener('click', () => this.setTool(id));
+      bar.appendChild(b);
+      this.btns[id] = b;
+    }
+    const sep = document.createElement('div');
+    sep.className = 'sep';
+    bar.appendChild(sep);
+    const del = document.createElement('button');
+    del.textContent = '🗑';
+    del.title = 'Удалить выбранный рисунок (или клавиша Delete)';
+    del.addEventListener('click', () => this._deleteSelected());
+    bar.appendChild(del);
+    const clear = document.createElement('button');
+    clear.textContent = '✕';
+    clear.title = 'Стереть все рисунки на этой монете';
+    clear.addEventListener('click', () => {
+      this.items = [];
+      this.sel = -1;
+      this.ruler = null;
+      this._save();
+      this.cv.requestDraw();
+    });
+    bar.appendChild(clear);
+    this.cv.el.appendChild(bar);
+    this.setTool('cursor');
+  }
+
+  setTool(id) {
+    this.tool = id;
+    this.draft = null;
+    for (const [k, b] of Object.entries(this.btns)) b.classList.toggle('active', k === id);
+    // пока активен инструмент — жесты не двигают график (важно для тача)
+    this.cv.el.style.touchAction = id === 'cursor' ? '' : 'none';
+    this.cv.requestDraw();
+  }
+
+  setSymbol(sym) {
+    if (sym === this.symbol) return;
+    this.symbol = sym;
+    this.items = this._load(sym);
+    this.sel = -1;
+    this.draft = null;
+    this.ruler = null;
+    this.cv.requestDraw();
+  }
+
+  /* ---------- хранение ---------- */
+  _load(sym) {
+    try { return (JSON.parse(localStorage.getItem(DRAW_STORE) || '{}')[sym]) || []; }
+    catch (e) { return []; }
+  }
+
+  _save() {
+    if (!this.symbol) return;
+    try {
+      const all = JSON.parse(localStorage.getItem(DRAW_STORE) || '{}');
+      if (this.items.length) all[this.symbol] = this.items;
+      else delete all[this.symbol];
+      localStorage.setItem(DRAW_STORE, JSON.stringify(all));
+    } catch (e) {}
+  }
+
+  _deleteSelected() {
+    if (this.sel < 0) return;
+    this.items.splice(this.sel, 1);
+    this.sel = -1;
+    this._save();
+    this.cv.requestDraw();
+  }
+
+  /* ---------- координаты ---------- */
+  _iv() {
+    const cs = this.cv.candles;
+    return cs && cs.length > 1 ? cs[1].t - cs[0].t : 60;
+  }
+
+  _t2l(t) { return (t - this.cv.candles[0].t) / this._iv(); }
+  _l2t(l) { return this.cv.candles[0].t + l * this._iv(); }
+
+  _xy(e) {
+    const r = this.cv.el.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  _pt(x, y) {
+    const l = this.cv.chart.timeScale().coordinateToLogical(x);
+    const price = this.cv.series.coordinateToPrice(y);
+    if (l == null || price == null) return null;
+    return { t: this._l2t(l), price };
+  }
+
+  _inPane(x, y) {
+    return x >= 0 && x <= this.cv._paneW() && y >= 0 && y <= this.cv._paneH();
+  }
+
+  _fmt(v) { return v.toFixed(this.cv.precision || 2); }
+
+  /* ---------- события ---------- */
+  _down(e) {
+    if (e.button > 0 || !this.cv.candles) return;
+    const { x, y } = this._xy(e);
+    if (!this._inPane(x, y)) return;
+    if (e.target.closest('.draw-toolbar') || e.target.closest('.chart-reset')) return;
+    this.ruler = null;
+    const pt = this._pt(x, y);
+    if (!pt) return;
+
+    if (this.tool === 'cursor') {
+      const hit = this._hitTest(x, y);
+      if (hit) {
+        this.sel = hit.i;
+        this.drag = { i: hit.i, handle: hit.handle, x0: x, y0: y,
+                      orig: JSON.parse(JSON.stringify(this.items[hit.i])) };
+        e.preventDefault();
+        e.stopPropagation();
+      } else if (this.sel >= 0) {
+        this.sel = -1;
+      }
+      this.cv.requestDraw();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (this.tool === 'hline') {
+      this.items.push({ type: 'hline', price: pt.price });
+      this.sel = this.items.length - 1;
+      this._save();
+      this.setTool('cursor');
+    } else if (this.tool === 'trend') {
+      this.draft = { type: 'trend', p1: pt, p2: pt };
+    } else if (this.tool === 'ruler') {
+      this.draft = { type: 'ruler', p1: pt, p2: pt };
+    } else if (this.tool === 'brush') {
+      this.draft = { type: 'brush', pts: [pt] };
+    } else if (this.tool === 'pos') {
+      if (!this.draft) {
+        this.draft = { type: 'pos', stage: 1, entry: pt, hover: pt };
+      } else if (this.draft.stage === 1) {
+        this.draft.target = pt.price;
+        this.draft.stage = 2;
+        this.draft.hover = pt;
+      } else {
+        const d = this.draft;
+        const bars = Math.max(20, Math.round((this.cv._paneW() / 12) / 2));
+        this.items.push({ type: 'pos', entry: d.entry, target: d.target,
+                          stop: pt.price, tEnd: d.entry.t + bars * this._iv() });
+        this.sel = this.items.length - 1;
+        this.draft = null;
+        this._save();
+        this.setTool('cursor');
+      }
+    }
+    this.cv.requestDraw();
+  }
+
+  _move(e) {
+    if (!this.cv.candles) return;
+    const { x, y } = this._xy(e);
+    const pt = this._pt(
+      Math.min(Math.max(x, 0), this.cv._paneW()),
+      Math.min(Math.max(y, 0), this.cv._paneH()));
+    if (!pt) return;
+
+    if (this.drag) {
+      const it = this.items[this.drag.i];
+      const o = this.drag.orig;
+      const l0 = this.cv.chart.timeScale().coordinateToLogical(this.drag.x0);
+      const l1 = this.cv.chart.timeScale().coordinateToLogical(x);
+      const dt = (l0 != null && l1 != null) ? (l1 - l0) * this._iv() : 0;
+      const p0 = this.cv.series.coordinateToPrice(this.drag.y0);
+      const dp = p0 != null ? pt.price - p0 : 0;
+      this._applyDrag(it, o, this.drag.handle, dt, dp, pt);
+      this.cv.requestDraw();
+      return;
+    }
+    if (!this.draft) return;
+    const d = this.draft;
+    if (d.type === 'trend' || d.type === 'ruler') d.p2 = pt;
+    else if (d.type === 'brush') d.pts.push(pt);
+    else if (d.type === 'pos') d.hover = pt;
+    this.cv.requestDraw();
+  }
+
+  _up() {
+    if (this.drag) {
+      this.drag = null;
+      this._save();
+      return;
+    }
+    const d = this.draft;
+    if (!d) return;
+    if (d.type === 'trend') {
+      if (Math.abs(d.p2.t - d.p1.t) > 0 || Math.abs(d.p2.price - d.p1.price) > 0) {
+        this.items.push({ type: 'trend', p1: d.p1, p2: d.p2 });
+        this.sel = this.items.length - 1;
+        this._save();
+      }
+      this.draft = null;
+      this.setTool('cursor');
+    } else if (d.type === 'brush') {
+      if (d.pts.length > 2) {
+        this.items.push({ type: 'brush', pts: d.pts });
+        this.sel = this.items.length - 1;
+        this._save();
+      }
+      this.draft = null;
+      this.setTool('cursor');
+    } else if (d.type === 'ruler') {
+      this.ruler = { p1: d.p1, p2: d.p2 };
+      this.draft = null;
+      this.setTool('cursor');
+    }
+    // pos создаётся кликами — по отпусканию ничего не делаем
+    this.cv.requestDraw();
+  }
+
+  _applyDrag(it, o, handle, dt, dp, pt) {
+    if (it.type === 'hline') { it.price = o.price + dp; return; }
+    if (it.type === 'trend') {
+      if (handle === 'p1') { it.p1 = { t: pt.t, price: pt.price }; }
+      else if (handle === 'p2') { it.p2 = { t: pt.t, price: pt.price }; }
+      else {
+        it.p1 = { t: o.p1.t + dt, price: o.p1.price + dp };
+        it.p2 = { t: o.p2.t + dt, price: o.p2.price + dp };
+      }
+      return;
+    }
+    if (it.type === 'brush') {
+      it.pts = o.pts.map(p => ({ t: p.t + dt, price: p.price + dp }));
+      return;
+    }
+    if (it.type === 'pos') {
+      if (handle === 'target') { it.target = pt.price; return; }
+      if (handle === 'stop') { it.stop = pt.price; return; }
+      if (handle === 'end') { it.tEnd = Math.max(o.entry.t + this._iv() * 3, o.tEnd + dt); return; }
+      it.entry = { t: o.entry.t + dt, price: o.entry.price + dp };
+      it.target = o.target + dp;
+      it.stop = o.stop + dp;
+      it.tEnd = o.tEnd + dt;
+    }
+  }
+
+  /* ---------- поиск под курсором ---------- */
+  _screen(it) {
+    const xOf = this.cv._xMapper();
+    if (!xOf) return null;
+    const yOf = p => this.cv.series.priceToCoordinate(p);
+    const X = t => xOf(this._t2l(t));
+    return { xOf, yOf, X };
+  }
+
+  _distSeg(x, y, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? ((x - x1) * dx + (y - y1) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = x1 + t * dx, py = y1 + t * dy;
+    return Math.hypot(x - px, y - py);
+  }
+
+  _hitTest(x, y) {
+    const m = this._screen({});
+    if (!m) return null;
+    const R = 7;
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const it = this.items[i];
+      if (it.type === 'hline') {
+        const yy = m.yOf(it.price);
+        if (yy != null && Math.abs(y - yy) < R) return { i, handle: 'body' };
+      } else if (it.type === 'trend') {
+        const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
+        const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
+        if (y1 == null || y2 == null) continue;
+        if (Math.hypot(x - x1, y - y1) < R) return { i, handle: 'p1' };
+        if (Math.hypot(x - x2, y - y2) < R) return { i, handle: 'p2' };
+        if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
+      } else if (it.type === 'brush') {
+        const pts = it.pts;
+        for (let k = 1; k < pts.length; k++) {
+          const x1 = m.X(pts[k - 1].t), y1 = m.yOf(pts[k - 1].price);
+          const x2 = m.X(pts[k].t), y2 = m.yOf(pts[k].price);
+          if (y1 == null || y2 == null) continue;
+          if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
+        }
+      } else if (it.type === 'pos') {
+        const x0 = m.X(it.entry.t), x1 = m.X(it.tEnd);
+        const yE = m.yOf(it.entry.price), yT = m.yOf(it.target), yS = m.yOf(it.stop);
+        if (yE == null || yT == null || yS == null) continue;
+        if (x >= x0 && x <= x1 + R) {
+          if (Math.abs(y - yT) < R) return { i, handle: 'target' };
+          if (Math.abs(y - yS) < R) return { i, handle: 'stop' };
+          if (Math.abs(x - x1) < R) return { i, handle: 'end' };
+          const top = Math.min(yT, yS), bot = Math.max(yT, yS);
+          if (y >= top - R && y <= bot + R) return { i, handle: 'body' };
+        }
+      }
+    }
+    return null;
+  }
+
+  /* ---------- отрисовка ---------- */
+  render() {
+    const cvs = this.canvas, dpr = window.devicePixelRatio || 1;
+    const w = this.cv.el.clientWidth, h = this.cv.el.clientHeight;
+    cvs.width = w * dpr; cvs.height = h * dpr;
+    cvs.style.width = w + 'px'; cvs.style.height = h + 'px';
+    const ctx = cvs.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!this.cv.candles) return;
+    const m = this._screen({});
+    if (!m) return;
+    const paneW = this.cv._paneW(), paneH = this.cv._paneH();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, paneW, paneH);
+    ctx.clip();
+    ctx.font = '10px -apple-system, sans-serif';
+
+    this.items.forEach((it, i) => this._renderItem(ctx, m, it, i === this.sel, paneW));
+    if (this.draft) this._renderDraft(ctx, m, paneW);
+    if (this.ruler) this._renderRuler(ctx, m, this.ruler);
+    ctx.restore();
+  }
+
+  _renderItem(ctx, m, it, selected, paneW) {
+    if (it.type === 'hline') {
+      const y = m.yOf(it.price);
+      if (y == null) return;
+      ctx.strokeStyle = '#e6edf3';
+      ctx.lineWidth = selected ? 2 : 1.2;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(paneW, y); ctx.stroke();
+      ctx.fillStyle = '#e6edf3';
+      ctx.fillText(this._fmt(it.price), paneW - ctx.measureText(this._fmt(it.price)).width - 4, y - 4);
+    } else if (it.type === 'trend') {
+      const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
+      const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
+      if (y1 == null || y2 == null) return;
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = selected ? 2.4 : 1.6;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      if (selected) this._handles(ctx, [[x1, y1], [x2, y2]]);
+    } else if (it.type === 'brush') {
+      ctx.strokeStyle = '#e3b341';
+      ctx.lineWidth = selected ? 2.6 : 1.8;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      it.pts.forEach((p, k) => {
+        const x = m.X(p.t), y = m.yOf(p.price);
+        if (y == null) return;
+        if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    } else if (it.type === 'pos') {
+      this._renderPos(ctx, m, it.entry, it.target, it.stop, it.tEnd, selected);
+    }
+  }
+
+  _renderPos(ctx, m, entry, target, stop, tEnd, selected) {
+    const x0 = m.X(entry.t), x1 = m.X(tEnd);
+    const yE = m.yOf(entry.price), yT = m.yOf(target), yS = m.yOf(stop);
+    if (yE == null || yT == null || yS == null) return;
+    const wBox = x1 - x0;
+    // зона прибыли и зона риска
+    ctx.fillStyle = 'rgba(38,166,154,0.14)';
+    ctx.fillRect(x0, Math.min(yE, yT), wBox, Math.abs(yT - yE));
+    ctx.fillStyle = 'rgba(239,83,80,0.14)';
+    ctx.fillRect(x0, Math.min(yE, yS), wBox, Math.abs(yS - yE));
+    for (const [y, c] of [[yE, '#e6edf3'], [yT, '#26a69a'], [yS, '#ef5350']]) {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = selected ? 2 : 1.3;
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    }
+    const long = target > entry.price;
+    const tpPct = Math.abs(target - entry.price) / entry.price * 100;
+    const slPct = Math.abs(entry.price - stop) / entry.price * 100;
+    const rr = slPct > 0 ? tpPct / slPct : 0;
+    ctx.fillStyle = long ? '#26a69a' : '#ef5350';
+    ctx.fillText(`${long ? 'ЛОНГ' : 'ШОРТ'} · RR 1:${rr.toFixed(1)}`, x0 + 4, yE + (long ? 12 : -5));
+    ctx.fillStyle = '#26a69a';
+    ctx.fillText(`тейк ${this._fmt(target)} (${tpPct.toFixed(2)}%)`, x0 + 4, yT + (long ? -5 : 12));
+    ctx.fillStyle = '#ef5350';
+    ctx.fillText(`стоп ${this._fmt(stop)} (${slPct.toFixed(2)}%)`, x0 + 4, yS + (long ? 12 : -5));
+    if (selected) this._handles(ctx, [[x1, yT], [x1, yS], [x1, yE]]);
+  }
+
+  _renderDraft(ctx, m, paneW) {
+    const d = this.draft;
+    ctx.setLineDash([4, 3]);
+    if (d.type === 'trend') {
+      const x1 = m.X(d.p1.t), y1 = m.yOf(d.p1.price);
+      const x2 = m.X(d.p2.t), y2 = m.yOf(d.p2.price);
+      if (y1 != null && y2 != null) {
+        ctx.strokeStyle = '#58a6ff';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      }
+    } else if (d.type === 'ruler') {
+      ctx.setLineDash([]);
+      this._renderRuler(ctx, m, d);
+    } else if (d.type === 'brush') {
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#e3b341';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      d.pts.forEach((p, k) => {
+        const x = m.X(p.t), y = m.yOf(p.price);
+        if (y == null) return;
+        if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    } else if (d.type === 'pos') {
+      ctx.setLineDash([]);
+      const hoverP = d.hover ? d.hover.price : d.entry.price;
+      const target = d.stage === 1 ? hoverP : d.target;
+      const stop = d.stage === 1
+        ? d.entry.price - (target - d.entry.price)
+        : hoverP;
+      const bars = Math.max(20, Math.round((this.cv._paneW() / 12) / 2));
+      this._renderPos(ctx, m, d.entry, target, stop, d.entry.t + bars * this._iv(), false);
+      ctx.fillStyle = '#8b949e';
+      const hint = d.stage === 1 ? 'клик 2 — тейк' : 'клик 3 — стоп';
+      ctx.fillText(hint, m.X(d.entry.t) + 4, m.yOf(d.entry.price) - 18);
+    }
+    ctx.setLineDash([]);
+  }
+
+  _renderRuler(ctx, m, r) {
+    const x1 = m.X(r.p1.t), y1 = m.yOf(r.p1.price);
+    const x2 = m.X(r.p2.t), y2 = m.yOf(r.p2.price);
+    if (y1 == null || y2 == null) return;
+    const up = r.p2.price >= r.p1.price;
+    const col = up ? 'rgba(38,166,154' : 'rgba(239,83,80';
+    ctx.fillStyle = col + ',0.12)';
+    ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+    ctx.strokeStyle = col + ',0.9)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    const dPct = (r.p2.price - r.p1.price) / r.p1.price * 100;
+    const bars = Math.round(Math.abs(r.p2.t - r.p1.t) / this._iv());
+    const mins = bars * this._iv() / 60;
+    const label = `${dPct > 0 ? '+' : ''}${dPct.toFixed(2)}% · ${this._fmt(Math.abs(r.p2.price - r.p1.price))} · ${bars} бар (${mins >= 60 ? (mins / 60).toFixed(1) + 'ч' : mins + 'м'})`;
+    const tw = ctx.measureText(label).width;
+    const bx = (x1 + x2) / 2 - tw / 2 - 5, by = Math.min(y1, y2) - 22;
+    ctx.fillStyle = 'rgba(13,17,23,0.92)';
+    ctx.fillRect(bx, by, tw + 10, 16);
+    ctx.strokeStyle = col + ',0.9)';
+    ctx.strokeRect(bx, by, tw + 10, 16);
+    ctx.fillStyle = up ? '#26a69a' : '#ef5350';
+    ctx.fillText(label, bx + 5, by + 11);
+  }
+
+  _handles(ctx, pts) {
+    for (const [x, y] of pts) {
+      ctx.fillStyle = '#0d1117';
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+  }
+}
+
+</script>
+<script>
 /* SMC-скринер: рейтинг волатильных монет + авторазметка + сетка сетапов (слом структуры / пробой) */
 const $ = s => document.querySelector(s);
 
@@ -1561,6 +2106,7 @@ async function refreshCharts(fit = false) {
       let m = null;
       try { m = await Metrics.get(sym, fundingOf(sym)); } catch (e) {}
       const cv = charts[{ m15: 'tf15', m5: 'tf5', m1: 'tf1' }[mode]];
+      if (cv.drawTools) cv.drawTools.setSymbol(sym);
       cv.setPrecision(price);
       cv.setTitle(`${sym} · ${cfg.label}`);
       cv.setData(cs, { fit });
@@ -1610,6 +2156,7 @@ document.addEventListener('DOMContentLoaded', () => {
   charts.tf15 = new ChartView($('#chartTf15'));
   charts.tf5 = new ChartView($('#chartTf5'));
   charts.tf1 = new ChartView($('#chartTf1'));
+  for (const k of ['tf15', 'tf5', 'tf1']) charts[k].drawTools = new DrawTools(charts[k]);
 
   $('#sidebar').addEventListener('click', e => {
     const c = e.target.closest('.coin');
