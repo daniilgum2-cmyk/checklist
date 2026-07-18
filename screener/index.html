@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMC-скринер · Bybit Futures</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+  color: #c9d1d9;
+  font: 13px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+}
+
+/* ---------- шапка ---------- */
+header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #21262d;
+  background: #161b22;
+  flex-wrap: wrap;
+}
+.brand { font-weight: 700; font-size: 15px; color: #e6edf3; }
+.brand .sub { font-weight: 400; font-size: 11px; color: #8b949e; margin-left: 4px; }
+
+.tabs { display: flex; gap: 4px; }
+.tabs button {
+  background: transparent;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.tabs button.active { background: #1f6feb22; border-color: #1f6feb; color: #e6edf3; }
+.tabs button:hover { color: #e6edf3; }
+
+.controls { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 12px; color: #8b949e; }
+.controls select {
+  background: #0d1117; color: #c9d1d9; border: 1px solid #30363d;
+  border-radius: 5px; padding: 3px 6px; font-size: 12px;
+}
+.controls button {
+  background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+  border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px;
+}
+.controls button:hover { background: #30363d; }
+#status { font-size: 11px; color: #7d8590; min-width: 130px; }
+#status.err { color: #f85149; }
+
+/* ---------- каркас ---------- */
+#layout { flex: 1; display: flex; min-height: 0; }
+
+aside#sidebar {
+  width: 250px;
+  flex: none;
+  overflow-y: auto;
+  border-right: 1px solid #21262d;
+  background: #0d1117;
+  padding: 6px;
+}
+
+main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+#symbolBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 12px 0;
+}
+#symbolBar b { font-size: 15px; color: #e6edf3; }
+#symbolBar a { color: #58a6ff; font-size: 12px; text-decoration: none; }
+#symbolBar a:hover { text-decoration: underline; }
+
+#layerBar {
+  flex: none;
+  padding: 5px 12px 0;
+  font-size: 11px;
+  color: #7d8590;
+}
+.lchip {
+  display: inline-block;
+  margin: 0 3px 3px 0;
+  padding: 1px 8px;
+  border: 1px solid #30363d;
+  border-radius: 9px;
+  cursor: pointer;
+  color: #6e7681;
+  user-select: none;
+}
+.lchip.on { color: #c9d1d9; border-color: #58a6ff88; background: #1f6feb14; }
+.lchip:hover { border-color: #58a6ff; }
+
+#summary {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #9da7b3;
+}
+#summary b { color: #e6edf3; font-weight: 600; }
+
+section.charts {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  min-height: 0;
+  padding: 4px 10px 10px;
+}
+section[hidden] { display: none; }
+.chartWrap {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0d1117;
+}
+.chart { position: absolute; inset: 0; }
+
+.chart-legend {
+  position: absolute;
+  top: 6px; left: 8px;
+  z-index: 4;
+  font: 11px ui-monospace, Menlo, monospace;
+  color: #c9d1d9;
+  pointer-events: none;
+  background: rgba(13,17,23,0.65);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.chart-reset {
+  position: absolute;
+  bottom: 34px; right: 76px;
+  z-index: 4;
+  font-size: 10px;
+  color: #8b949e;
+  background: rgba(22,27,34,0.85);
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.chart-reset:hover { color: #e6edf3; border-color: #58a6ff; }
+
+/* ---------- сетка формаций ---------- */
+#setupGrid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 8px;
+  overflow-y: auto;
+  align-content: start;
+}
+.fcard {
+  height: 330px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  background: #0d1117;
+  overflow: hidden;
+}
+.fhead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: #161b22;
+  cursor: pointer;
+  font-size: 12px;
+}
+.fhead b { color: #e6edf3; font-size: 13px; }
+.fbadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 8px;
+  letter-spacing: 0.3px;
+}
+.fbadge.long { background: #23863626; color: #3fb950; border: 1px solid #3fb95055; }
+.fbadge.short { background: #f8514926; color: #f85149; border: 1px solid #f8514955; }
+.fbadge.break { background: #1f6feb26; color: #58a6ff; border: 1px solid #1f6feb55; }
+.fago { font-size: 11px; color: #7d8590; }
+.fopen { margin-left: auto; font-size: 11px; color: #58a6ff; }
+.fchart { flex: 1; min-height: 0; position: relative; }
+.ffoot {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #9da7b3;
+  background: #10151c;
+  border-top: 1px solid #21262d;
+  cursor: pointer;
+}
+.ffoot b { color: #e6edf3; }
+.ffoot .stop { color: #f85149; }
+.ffoot .tp { color: #3fb950; }
+.ffoot i { color: #6e7681; font-style: normal; }
+
+/* ---------- страница плана сделки ---------- */
+section.plan { flex-direction: column; }
+.plan-body { flex: 1; display: flex; gap: 8px; min-height: 0; }
+
+#setupCards { flex: none; display: flex; gap: 8px; flex-wrap: wrap; }
+.setup-card {
+  flex: 1;
+  min-width: 210px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #161b22;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+.setup-card:hover { border-color: #58a6ff66; }
+.setup-card.active { border-color: #1f6feb; background: #16213040; }
+.sc-head { display: flex; align-items: center; gap: 8px; }
+.sc-rank { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: #21262d; color: #8b949e; }
+.sc-rank.r1 { background: #e3b34122; color: #e3b341; }
+.sc-rank.r2 { background: #8b949e22; color: #b1bac4; }
+.sc-rank.r3 { background: #f0883e22; color: #f0883e; }
+.sc-head b { font-size: 13px; color: #e6edf3; }
+.sc-tf { font-size: 10px; color: #58a6ff; border: 1px solid #58a6ff44; border-radius: 4px; padding: 0 5px; }
+.sc-side { font-size: 11px; font-weight: 700; }
+.sc-side.long { color: #26a69a; }
+.sc-side.short { color: #ef5350; }
+.sc-score { margin-left: auto; font-size: 13px; font-weight: 700; color: #e6edf3; background: #21262d; border-radius: 6px; padding: 1px 8px; }
+.sc-row { font-size: 11px; color: #9da7b3; margin-top: 4px; }
+.sc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.sc-chips span { font-size: 10px; color: #8b949e; border: 1px solid #30363d; border-radius: 8px; padding: 0 6px; }
+.sc-empty { flex: 1; padding: 10px 12px; font-size: 12px; color: #8b949e; border: 1px dashed #30363d; border-radius: 8px; }
+
+.trade-card.long { border-color: #26a69a88; background: #26a69a0d; }
+.trade-card.short { border-color: #ef535088; background: #ef53500d; }
+.sc-rank.live { background: #23863626; color: #3fb950; }
+
+.plan-close-btn {
+  display: block;
+  width: 100%;
+  margin: 4px 0 10px;
+  padding: 6px;
+  background: #21262d;
+  border: 1px solid #f8514966;
+  color: #f85149;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.plan-close-btn:hover { background: #f8514922; }
+
+.journal { margin-top: 10px; border-top: 1px solid #21262d; padding-top: 8px; }
+.jhead { font-size: 11px; color: #8b949e; margin-bottom: 6px; font-weight: 600; }
+.jrow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: #9da7b3;
+  padding: 2px 0;
+}
+.jrow b { color: #e6edf3; }
+.jrow .long { color: #26a69a; }
+.jrow .short { color: #ef5350; }
+.jrow .pos { color: #3fb950; margin-left: auto; font-weight: 600; }
+.jrow .neg { color: #f85149; margin-left: auto; font-weight: 600; }
+.jrow.dim { color: #6e7681; }
+.jrow span:last-child { margin-left: auto; }
+
+.planChart { flex: 1.6; }
+#planPanel {
+  flex: 1;
+  min-width: 300px;
+  max-width: 380px;
+  overflow-y: auto;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  background: #10151c;
+  padding: 12px 14px;
+  font-size: 12.5px;
+}
+.plan-status {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  letter-spacing: 0.3px;
+}
+.plan-status.approach { background: #1f6feb26; color: #58a6ff; border: 1px solid #1f6feb66; }
+.plan-status.inzone { background: #e3b34126; color: #e3b341; border: 1px solid #e3b34166; }
+.plan-status.trigger { background: #23863626; color: #3fb950; border: 1px solid #3fb95066; }
+.plan-status.none { background: #6e768126; color: #8b949e; border: 1px solid #30363d; }
+.plan-side { font-size: 16px; font-weight: 700; margin: 2px 0 8px; }
+.plan-side.long { color: #26a69a; }
+.plan-side.short { color: #ef5350; }
+.plan-why { color: #9da7b3; margin-bottom: 10px; line-height: 1.5; }
+.plan-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-bottom: 12px; }
+.plan-grid .k { color: #7d8590; }
+.plan-grid .v { color: #e6edf3; font-family: ui-monospace, Menlo, monospace; }
+.plan-grid .v.stop { color: #f85149; }
+.plan-grid .v.tp { color: #3fb950; }
+.plan-steps { margin: 0; padding-left: 18px; color: #c9d1d9; }
+.plan-steps li { margin-bottom: 7px; line-height: 1.45; }
+.plan-steps li.done { color: #3fb950; }
+.plan-warn {
+  margin-top: 10px;
+  padding: 7px 10px;
+  border-left: 3px solid #e3b341;
+  background: #e3b34112;
+  color: #d4a72c;
+  font-size: 11.5px;
+  border-radius: 0 6px 6px 0;
+}
+.plan-note { margin-top: 10px; font-size: 11px; color: #6e7681; }
+.plan-score { font-size: 11px; color: #8b949e; font-weight: 400; margin-left: 6px; }
+.plan-metrics {
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  background: #0d1117;
+  font-size: 11.5px;
+  color: #9da7b3;
+  line-height: 1.6;
+}
+.plan-reasons { font-size: 11.5px; color: #9da7b3; margin-bottom: 10px; line-height: 1.5; }
+
+.row3 .hot { color: #e3b341; }
+
+/* узкий экран: план в колонку — график сверху, панель снизу */
+@media (max-width: 1100px) {
+  #viewPlan { overflow-y: auto; }
+  #viewPlan .plan-body { flex-direction: column; flex: none; }
+  #viewPlan .planChart { flex: none; height: 420px; min-height: 420px; }
+  #viewPlan #planPanel { flex: none; max-width: none; width: 100%; }
+}
+
+/* ---------- монеты в сайдбаре ---------- */
+.coin {
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+.coin:hover { background: #161b22; }
+.coin.active { background: #161b22; border-color: #1f6feb; }
+.coin .row1 { display: flex; align-items: center; gap: 7px; }
+.coin .rank {
+  font-size: 10px; color: #7d8590;
+  background: #21262d; border-radius: 4px;
+  padding: 1px 5px;
+}
+.coin .row1 b { font-size: 13px; color: #e6edf3; }
+.coin .chg { margin-left: auto; font-size: 12px; font-weight: 600; }
+.chg.pos { color: #26a69a; }
+.chg.neg { color: #ef5350; }
+.coin .row2 {
+  display: flex; gap: 10px;
+  font-size: 11px; color: #7d8590;
+  margin-top: 3px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.chip {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  color: #8b949e;
+}
+.chip.gold { color: #e3b341; border-color: #e3b34155; }
+.chip.blue { color: #58a6ff; border-color: #58a6ff55; }
+.chip.orange { color: #f0883e; border-color: #f0883e55; }
+.chip.dim { opacity: 0.55; }
+
+footer {
+  flex: none;
+  padding: 5px 14px;
+  font-size: 11px;
+  color: #6e7681;
+  border-top: 1px solid #21262d;
+  background: #161b22;
+}
+
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">SMC-скринер <span class="sub">Bybit Futures</span></div>
+  <nav class="tabs">
+    <button data-mode="setups" class="active">⚡ Сетапы</button>
+    <button data-mode="m15">15M</button>
+    <button data-mode="m5">5M</button>
+    <button data-mode="m1">1M</button>
+  </nav>
+  <div class="controls">
+    <label>Топ
+      <select id="selN">
+        <option value="5" selected>5</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+      </select>
+    </label>
+    <label>Оборот ≥
+      <select id="selTo">
+        <option value="10000000">$10M</option>
+        <option value="30000000" selected>$30M</option>
+        <option value="100000000">$100M</option>
+      </select>
+    </label>
+    <button id="btnRefresh">⟳ Обновить</button>
+    <span id="status"></span>
+  </div>
+</header>
+
+<div id="layout">
+  <aside id="sidebar"></aside>
+  <main>
+    <div id="symbolBar">
+      <b id="curSym">—</b>
+      <a id="lnkTV" target="_blank" rel="noopener">↗ TradingView</a>
+      <a id="lnkBB" target="_blank" rel="noopener">↗ Bybit</a>
+    </div>
+    <div id="layerBar"></div>
+    <div id="summary"></div>
+    <section id="viewSetups" class="charts">
+      <div id="setupGrid"></div>
+    </section>
+    <section id="viewM15" class="charts" hidden>
+      <div class="chartWrap"><div class="chart" id="chartTf15"></div></div>
+    </section>
+    <section id="viewM5" class="charts" hidden>
+      <div class="chartWrap"><div class="chart" id="chartTf5"></div></div>
+    </section>
+    <section id="viewM1" class="charts" hidden>
+      <div class="chartWrap"><div class="chart" id="chartTf1"></div></div>
+    </section>
+  </main>
+</div>
+
+<footer>Авторазметка по Smart Money — помощник для анализа, а не торговые сигналы. Вход, стоп и риск — твоё решение.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+/* Bybit v5 API через локальный прокси */
+const API = {
+  // локально (server.py, порт 8737) - через прокси, в облаке - напрямую в Bybit
+  base: location.port === '8737' ? '/bybit' : 'https://api.bybit.com',
+  async get(path, params) {
+    const qs = new URLSearchParams(params).toString();
+    const r = await fetch(`${API.base}${path}?${qs}`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    if (j.retCode !== 0) throw new Error(j.retMsg || 'ошибка API');
+    return j.result;
+  },
+
+  async tickers() {
+    return (await this.get('/v5/market/tickers', { category: 'linear' })).list;
+  },
+
+  // свечи приходят от новых к старым — разворачиваем; время в секундах, сдвинутое в локальный пояс
+  async klines(symbol, interval, limit = 400) {
+    const res = await this.get('/v5/market/kline', { category: 'linear', symbol, interval, limit });
+    const shift = -new Date().getTimezoneOffset() * 60;
+    return res.list.map(r => ({
+      t: Math.floor(+r[0] / 1000) + shift,
+      o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5],
+    })).reverse();
+  },
+
+  // история открытого интереса (новые первыми), 15-мин интервалы
+  async oiHistory(symbol, limit = 17) {
+    const res = await this.get('/v5/market/open-interest', { category: 'linear', symbol, intervalTime: '15min', limit });
+    return res.list.map(r => ({ t: +r.timestamp, oi: +r.openInterest }));
+  },
+
+  // соотношение лонг/шорт аккаунтов
+  async accountRatio(symbol) {
+    const res = await this.get('/v5/market/account-ratio', { category: 'linear', symbol, period: '15min', limit: 1 });
+    const r = res.list && res.list[0];
+    return r ? { buy: +r.buyRatio, sell: +r.sellRatio } : null;
+  },
+
+  // стакан: реальные лимитные ордера
+  async orderbook(symbol) {
+    return await this.get('/v5/market/orderbook', { category: 'linear', symbol, limit: 200 });
+  },
+};
+
+</script>
+<script>
+/* Реальные биржевые метрики Bybit: открытый интерес, long/short, стены лимиток в стакане.
+   Важно: стакан показывает лимитные ордера, а не стопы — стопы не видит никто. */
+const Metrics = (() => {
+  const cache = new Map(); // sym -> {ts, data}
+  const TTL = 60000;
+
+  // стена = уровень, где лимиток в разы больше среднего по стакану (в пределах ±5% от цены)
+  function findWalls(ob) {
+    const mid = (+ob.b[0][0] + +ob.a[0][0]) / 2;
+    const calc = (rows, side) => {
+      const levels = rows.map(r => ({ p: +r[0], usd: +r[0] * +r[1] }));
+      const avg = levels.reduce((s, l) => s + l.usd, 0) / (levels.length || 1);
+      return levels
+        .filter(l => l.usd > 6 * avg && Math.abs(l.p - mid) / mid < 0.05)
+        .sort((a, b) => b.usd - a.usd)
+        .slice(0, 3)
+        .map(l => ({ price: l.p, usd: l.usd, side }));
+    };
+    return [...calc(ob.b, 'bid'), ...calc(ob.a, 'ask')];
+  }
+
+  async function get(sym, funding = null) {
+    const hit = cache.get(sym);
+    if (hit && Date.now() - hit.ts < TTL) {
+      if (funding != null) hit.data.funding = funding;
+      return hit.data;
+    }
+    const data = { funding, oiChg: null, ls: null, walls: [] };
+    const [oi, ratio, ob] = await Promise.allSettled([
+      API.oiHistory(sym), API.accountRatio(sym), API.orderbook(sym),
+    ]);
+    if (oi.status === 'fulfilled' && oi.value.length > 1) {
+      const list = oi.value; // новые первыми
+      const latest = list[0].oi, oldest = list[list.length - 1].oi;
+      if (oldest > 0) data.oiChg = (latest - oldest) / oldest * 100; // изменение за ~4ч
+    }
+    if (ratio.status === 'fulfilled' && ratio.value) {
+      data.ls = ratio.value.buy / (ratio.value.sell || 1);
+    }
+    if (ob.status === 'fulfilled' && ob.value && ob.value.b?.length && ob.value.a?.length) {
+      data.walls = findWalls(ob.value);
+    }
+    cache.set(sym, { ts: Date.now(), data });
+    return data;
+  }
+
+  return { get };
+})();
+
+</script>
+<script>
+/* Smart Money разметка: пивоты, структура (BOS/ЧоЧ), равные лои/хаи (ликвидность),
+   ордер-блоки, FVG, снятия (SFP), ножи, консолидация, премиум/дисконт. */
+const SMC = (() => {
+
+  function atrSeries(cs, period = 14) {
+    const out = new Array(cs.length).fill(0);
+    let sum = 0;
+    for (let i = 0; i < cs.length; i++) {
+      const c = cs[i];
+      const tr = i === 0 ? c.h - c.l
+        : Math.max(c.h - c.l, Math.abs(c.h - cs[i - 1].c), Math.abs(c.l - cs[i - 1].c));
+      if (i < period) { sum += tr; out[i] = sum / (i + 1); }
+      else out[i] = (out[i - 1] * (period - 1) + tr) / period;
+    }
+    return out;
+  }
+
+  // фрактальные пивоты; слева строгое сравнение, справа нестрогое (плоские вершины не дублируются)
+  function findPivots(cs, left = 3, right = 3) {
+    const piv = [];
+    for (let i = left; i < cs.length - right; i++) {
+      let isH = true, isL = true;
+      for (let j = i - left; j <= i + right; j++) {
+        if (j === i) continue;
+        if (j < i) {
+          if (cs[j].h > cs[i].h) isH = false;
+          if (cs[j].l < cs[i].l) isL = false;
+        } else {
+          if (cs[j].h >= cs[i].h) isH = false;
+          if (cs[j].l <= cs[i].l) isL = false;
+        }
+        if (!isH && !isL) break;
+      }
+      if (isH) piv.push({ i, price: cs[i].h, type: 'H', confirmed: i + right });
+      if (isL) piv.push({ i, price: cs[i].l, type: 'L', confirmed: i + right });
+    }
+    return piv;
+  }
+
+  // структура: BOS = пробой по тренду, ЧоЧ = первый пробой против тренда
+  function buildStructure(cs, piv) {
+    const events = [];
+    const byConfirm = [...piv].sort((a, b) => a.confirmed - b.confirmed);
+    let swingH = null, swingL = null, trend = 0, pi = 0;
+    for (let i = 0; i < cs.length; i++) {
+      while (pi < byConfirm.length && byConfirm[pi].confirmed <= i) {
+        const p = byConfirm[pi++];
+        if (p.type === 'H') { if (!swingH || p.i > swingH.i) swingH = p; }
+        else { if (!swingL || p.i > swingL.i) swingL = p; }
+      }
+      const c = cs[i];
+      if (swingH && c.c > swingH.price) {
+        events.push({ at: i, from: swingH.i, level: swingH.price, dir: 1, type: trend === -1 ? 'CHOCH' : 'BOS' });
+        trend = 1; swingH = null;
+      }
+      if (swingL && c.c < swingL.price) {
+        events.push({ at: i, from: swingL.i, level: swingL.price, dir: -1, type: trend === 1 ? 'CHOCH' : 'BOS' });
+        trend = -1; swingL = null;
+      }
+    }
+    return { events, trend };
+  }
+
+  // равные лои/хаи: группы пивотов одного типа в пределах допуска -> уровень ликвидности
+  function equalLevels(cs, piv, atrArr, tolMult = 0.25) {
+    const res = [];
+    for (const type of ['H', 'L']) {
+      const ps = piv.filter(p => p.type === type);
+      let group = [];
+      const flush = () => {
+        if (group.length >= 2) {
+          const prices = group.map(g => g.price);
+          res.push({
+            kind: type === 'L' ? 'EQL' : 'EQH',
+            price: type === 'L' ? Math.min(...prices) : Math.max(...prices),
+            i0: group[0].i, iLast: group[group.length - 1].i, count: group.length,
+          });
+        }
+        group = [];
+      };
+      for (const p of ps) {
+        if (!group.length) { group = [p]; continue; }
+        const tol = tolMult * (atrArr[p.i] || 0);
+        if (Math.abs(p.price - group[0].price) <= tol) group.push(p);
+        else { flush(); group = [p]; }
+      }
+      flush();
+    }
+    // снята ли ликвидность после последнего касания
+    for (const lv of res) {
+      lv.swept = false;
+      for (let k = lv.iLast + 1; k < cs.length; k++) {
+        if (lv.kind === 'EQL' && cs[k].l < lv.price - 0.02 * (atrArr[k] || 0)) { lv.swept = true; lv.sweptAt = k; break; }
+        if (lv.kind === 'EQH' && cs[k].h > lv.price + 0.02 * (atrArr[k] || 0)) { lv.swept = true; lv.sweptAt = k; break; }
+      }
+    }
+    return res;
+  }
+
+  // ордер-блок: последняя встречная свеча перед импульсом, сломавшим структуру
+  function orderBlocks(cs, events) {
+    const obs = [];
+    for (const ev of events) {
+      let found = null;
+      for (let j = ev.at - 1; j >= Math.max(0, ev.at - 25); j--) {
+        const c = cs[j];
+        if (ev.dir === 1 && c.c < c.o) { found = j; break; }
+        if (ev.dir === -1 && c.c > c.o) { found = j; break; }
+      }
+      if (found === null) continue;
+      const c = cs[found];
+      const zone = ev.dir === 1
+        ? { top: Math.max(c.o, c.c), bottom: c.l }
+        : { top: c.h, bottom: Math.min(c.o, c.c) };
+      if (zone.top <= zone.bottom) continue;
+      obs.push({ i: found, dir: ev.dir, ...zone, ev });
+    }
+    // митигирован / отработан
+    for (const ob of obs) {
+      ob.touched = false; ob.dead = false;
+      for (let k = ob.ev.at; k < cs.length; k++) {
+        const c = cs[k];
+        if (ob.dir === 1) {
+          if (c.c < ob.bottom) { ob.dead = true; break; }
+          if (c.l <= ob.top) ob.touched = true;
+        } else {
+          if (c.c > ob.top) { ob.dead = true; break; }
+          if (c.h >= ob.bottom) ob.touched = true;
+        }
+      }
+    }
+    const alive = obs.filter(o => !o.dead);
+    // не дублируем зоны с одной свечи
+    const seen = new Set();
+    return alive.filter(o => { const k = o.i + ':' + o.dir; if (seen.has(k)) return false; seen.add(k); return true; });
+  }
+
+  // имбаланс (FVG), с учётом частичного заполнения
+  function findFVG(cs) {
+    const out = [];
+    for (let i = 2; i < cs.length; i++) {
+      if (cs[i].l > cs[i - 2].h) out.push({ i: i - 1, dir: 1, top: cs[i].l, bottom: cs[i - 2].h });
+      if (cs[i].h < cs[i - 2].l) out.push({ i: i - 1, dir: -1, top: cs[i - 2].l, bottom: cs[i].h });
+    }
+    for (const f of out) {
+      f.filled = false; f.curTop = f.top; f.curBottom = f.bottom;
+      for (let k = f.i + 2; k < cs.length; k++) {
+        const c = cs[k];
+        if (f.dir === 1) {
+          if (c.l <= f.bottom) { f.filled = true; break; }
+          f.curTop = Math.min(f.curTop, c.l);
+        } else {
+          if (c.h >= f.top) { f.filled = true; break; }
+          f.curBottom = Math.max(f.curBottom, c.h);
+        }
+      }
+    }
+    return out.filter(f => !f.filled && f.curTop > f.curBottom);
+  }
+
+  // SFP / снятие: свеча прокалывает прошлый пивот, но закрывается обратно
+  function findSweeps(cs, piv, atrArr, lookback = 90) {
+    const out = [];
+    const lows = piv.filter(p => p.type === 'L');
+    const highs = piv.filter(p => p.type === 'H');
+    for (let i = Math.max(5, cs.length - lookback); i < cs.length; i++) {
+      const c = cs[i], a = atrArr[i] || 0;
+      for (let k = lows.length - 1; k >= 0; k--) {
+        const p = lows[k];
+        if (p.i >= i - 1) continue;
+        if (i - p.i > 120) break;
+        if (c.l < p.price && c.c > p.price && (p.price - c.l) >= 0.1 * a) {
+          out.push({ i, dir: 1, level: p.price }); break;
+        }
+      }
+      for (let k = highs.length - 1; k >= 0; k--) {
+        const p = highs[k];
+        if (p.i >= i - 1) continue;
+        if (i - p.i > 120) break;
+        if (c.h > p.price && c.c < p.price && (c.h - p.price) >= 0.1 * a) {
+          out.push({ i, dir: -1, level: p.price }); break;
+        }
+      }
+    }
+    return out.slice(-6);
+  }
+
+  // нож: аномально большая направленная свеча
+  function findKnives(cs, atrArr, lookback = 90) {
+    const out = [];
+    for (let i = Math.max(1, cs.length - lookback); i < cs.length; i++) {
+      const c = cs[i], rng = c.h - c.l, a = atrArr[i] || 0;
+      if (a > 0 && rng >= 2.8 * a && Math.abs(c.c - c.o) >= 0.55 * rng) {
+        out.push({ i, dir: c.c < c.o ? -1 : 1 });
+      }
+    }
+    return out.slice(-5);
+  }
+
+  // сжатие: последние N баров в узком диапазоне -> формация под пробой
+  function findConsolidation(cs, atrArr, win = 30, mult = 3.0) {
+    if (cs.length < win + 5) return null;
+    const seg = cs.slice(cs.length - win);
+    let top = -Infinity, bottom = Infinity;
+    for (const c of seg) { top = Math.max(top, c.h); bottom = Math.min(bottom, c.l); }
+    const a = atrArr[cs.length - 1] || 0;
+    if (a > 0 && top - bottom <= mult * a) return { i0: cs.length - win, top, bottom };
+    return null;
+  }
+
+  // диапазон сделки для премиум/дисконта: экстремумы пивотов в окне
+  function dealingRange(cs, piv, lookback = 120) {
+    const from = Math.max(0, cs.length - lookback);
+    let hi = null, lo = null;
+    for (const p of piv) {
+      if (p.i < from) continue;
+      if (p.type === 'H' && (!hi || p.price > hi.price)) hi = p;
+      if (p.type === 'L' && (!lo || p.price < lo.price)) lo = p;
+    }
+    if (!hi || !lo) return null;
+    return { high: hi.price, low: lo.price, eq: (hi.price + lo.price) / 2, hiI: hi.i, loI: lo.i };
+  }
+
+  function analyze(cs, opts = {}) {
+    const o = Object.assign({ left: 3, right: 3, tolMult: 0.25, sweepLb: 90, knifeLb: 90, consolWin: 30, rangeLb: 120 }, opts);
+    const atrArr = atrSeries(cs);
+    const piv = findPivots(cs, o.left, o.right);
+    const { events, trend } = buildStructure(cs, piv);
+    return {
+      atr: atrArr, piv, events, trend,
+      levels: equalLevels(cs, piv, atrArr, o.tolMult),
+      obs: orderBlocks(cs, events),
+      fvgs: findFVG(cs),
+      sweeps: findSweeps(cs, piv, atrArr, o.sweepLb),
+      knives: findKnives(cs, atrArr, o.knifeLb),
+      consol: findConsolidation(cs, atrArr, o.consolWin),
+      range: dealingRange(cs, piv, o.rangeLb),
+    };
+  }
+
+  return { analyze };
+})();
+
+</script>
+<script>
+/* Свечной график (lightweight-charts) + оверлей-канвас для SMC-разметки:
+   зоны (OB/FVG), уровни ликвидности, линии структуры, боксы, премиум/дисконт. */
+class ChartView {
+  constructor(el) {
+    this.el = el;
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    this.chart = LightweightCharts.createChart(el, {
+      autoSize: true,
+      layout: { background: { color: 'transparent' }, textColor: '#8b949e', fontSize: 11 },
+      grid: {
+        vertLines: { color: 'rgba(110,118,129,0.08)' },
+        horzLines: { color: 'rgba(110,118,129,0.08)' },
+      },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: 'rgba(110,118,129,0.3)', rightOffset: 6 },
+      rightPriceScale: { borderColor: 'rgba(110,118,129,0.3)' },
+      crosshair: { mode: 0 },
+    });
+    this.series = this.chart.addCandlestickSeries({
+      upColor: '#26a69a', downColor: '#ef5350',
+      wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+      borderVisible: false,
+    });
+    this.canvas = document.createElement('canvas');
+    Object.assign(this.canvas.style, { position: 'absolute', left: 0, top: 0, pointerEvents: 'none', zIndex: 3 });
+    el.appendChild(this.canvas);
+
+    this.legend = document.createElement('div');
+    this.legend.className = 'chart-legend';
+    el.appendChild(this.legend);
+
+    this.resetBtn = document.createElement('button');
+    this.resetBtn.className = 'chart-reset';
+    this.resetBtn.textContent = '⟲ к цене';
+    this.resetBtn.title = 'Вернуть график к текущей цене (или двойной клик)';
+    this.resetBtn.addEventListener('click', () => this.resetView());
+    el.appendChild(this.resetBtn);
+    el.addEventListener('dblclick', () => this.resetView());
+
+    this.candles = null;
+    this.drawings = null;
+    this._raf = null;
+
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => this.requestDraw());
+    new ResizeObserver(() => this.requestDraw()).observe(el);
+    this.chart.subscribeCrosshairMove(p => this._updateLegend(p));
+  }
+
+  setPrecision(price) {
+    let p = 2;
+    if (price < 0.0001) p = 8;
+    else if (price < 0.001) p = 7;
+    else if (price < 0.01) p = 6;
+    else if (price < 0.1) p = 5;
+    else if (price < 1) p = 4;
+    else if (price < 100) p = 3;
+    this.precision = p;
+    this.series.applyOptions({ priceFormat: { type: 'price', precision: p, minMove: Math.pow(10, -p) } });
+  }
+
+  setData(candles, { fit = false } = {}) {
+    const ts = this.chart.timeScale();
+    const prevRange = this.candles && !fit ? ts.getVisibleRange() : null;
+    this.candles = candles;
+    this.series.setData(candles.map(c => ({ time: c.t, open: c.o, high: c.h, low: c.l, close: c.c })));
+    if (prevRange) ts.setVisibleRange(prevRange);
+    else this.resetView();
+    this.requestDraw();
+  }
+
+  // сброс: последние ~140 баров + автомасштаб цены (чтобы график не «терялся» при смене монеты)
+  resetView() {
+    if (!this.candles || !this.candles.length) return;
+    this.chart.priceScale('right').applyOptions({ autoScale: true });
+    this.chart.timeScale().setVisibleLogicalRange({
+      from: Math.max(0, this.candles.length - 140),
+      to: this.candles.length + 8,
+    });
+    this.requestDraw();
+  }
+
+  setMarkers(markers) {
+    this.series.setMarkers(markers.sort((a, b) => a.time - b.time));
+  }
+
+  setDrawings(d) {
+    this.drawings = d;
+    this.requestDraw();
+  }
+
+  requestDraw() {
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => { this._raf = null; this.draw(); });
+  }
+
+  _updateLegend(p) {
+    if (!p || !p.seriesData || !p.seriesData.get(this.series)) { this.legend.textContent = this._title || ''; return; }
+    const d = p.seriesData.get(this.series);
+    const f = v => v.toFixed(this.precision || 2);
+    this.legend.textContent = `${this._title || ''}  O ${f(d.open)}  H ${f(d.high)}  L ${f(d.low)}  C ${f(d.close)}`;
+  }
+
+  setTitle(t) { this._title = t; this.legend.textContent = t; }
+
+  // x-координата по логическому индексу бара (работает и за пределами видимой области)
+  _xMapper() {
+    const ts = this.chart.timeScale();
+    const lr = ts.getVisibleLogicalRange();
+    if (!lr || lr.to === lr.from) return null;
+    const a = Math.max(0, Math.ceil(lr.from));
+    const b = Math.min(this.candles.length - 1, Math.floor(lr.to));
+    let xa = ts.logicalToCoordinate(a), xb = ts.logicalToCoordinate(b);
+    if (xa == null || xb == null || b <= a) {
+      const w = this._paneW();
+      return l => (l - lr.from) / (lr.to - lr.from) * w;
+    }
+    const slope = (xb - xa) / (b - a);
+    return l => xa + (l - a) * slope;
+  }
+
+  _paneW() {
+    let psw = 60;
+    try { psw = this.chart.priceScale('right').width(); } catch (e) {}
+    return this.el.clientWidth - psw;
+  }
+
+  _paneH() {
+    let tsh = 28;
+    try { tsh = this.chart.timeScale().height(); } catch (e) {}
+    return this.el.clientHeight - tsh;
+  }
+
+  draw() {
+    const cv = this.canvas, dpr = window.devicePixelRatio || 1;
+    const w = this.el.clientWidth, h = this.el.clientHeight;
+    cv.width = w * dpr; cv.height = h * dpr;
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!this.candles || !this.drawings) return;
+
+    const xOf = this._xMapper();
+    if (!xOf) return;
+    const yOf = p => this.series.priceToCoordinate(p);
+    const paneW = this._paneW(), paneH = this._paneH();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, paneW, paneH);
+    ctx.clip();
+    ctx.font = '10px -apple-system, sans-serif';
+
+    const d = this.drawings;
+
+    // фоновые полосы (премиум/дисконт)
+    for (const b of d.bands || []) {
+      const y1 = yOf(b.top), y2 = yOf(b.bottom);
+      if (y1 == null || y2 == null) continue;
+      ctx.fillStyle = b.fill;
+      ctx.fillRect(0, y1, paneW, y2 - y1);
+      if (b.label) {
+        ctx.fillStyle = b.color || 'rgba(139,148,158,0.7)';
+        ctx.fillText(b.label, 6, Math.min(y1, y2) + 12);
+      }
+    }
+
+    // зоны: OB / FVG / боксы консолидации
+    for (const z of d.zones || []) {
+      const x1 = xOf(z.i0);
+      const x2 = z.i1 != null ? xOf(z.i1) : paneW;
+      const y1 = yOf(z.top), y2 = yOf(z.bottom);
+      if (y1 == null || y2 == null) continue;
+      ctx.fillStyle = z.fill;
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      if (z.stroke) {
+        ctx.strokeStyle = z.stroke;
+        ctx.lineWidth = 1;
+        ctx.setLineDash(z.dash || []);
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.setLineDash([]);
+      }
+      if (z.label) {
+        ctx.fillStyle = z.labelColor || z.stroke || '#8b949e';
+        ctx.fillText(z.label, Math.max(x1, 2) + 3, (y1 + y2) / 2 + 3);
+      }
+    }
+
+    // горизонтальные уровни (ликвидность, EQ)
+    for (const ln of d.hlines || []) {
+      const y = yOf(ln.price);
+      if (y == null) continue;
+      const x1 = ln.i0 != null ? xOf(ln.i0) : 0;
+      const x2 = ln.i1 != null ? xOf(ln.i1) : paneW;
+      ctx.strokeStyle = ln.color;
+      ctx.lineWidth = ln.width || 1;
+      ctx.setLineDash(ln.dash || []);
+      ctx.beginPath();
+      ctx.moveTo(x1, y); ctx.lineTo(x2, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (ln.label) {
+        ctx.fillStyle = ln.color;
+        const tw = ctx.measureText(ln.label).width;
+        ctx.fillText(ln.label, Math.min(x2 - tw - 4, paneW - tw - 4), y - 4);
+      }
+    }
+
+    // линии структуры (BOS/ЧоЧ): от пивота до свечи пробоя
+    for (const s of d.slines || []) {
+      const x1 = xOf(s.i0), x2 = xOf(s.i1);
+      const y = yOf(s.price);
+      if (y == null) continue;
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x1, y); ctx.lineTo(x2, y);
+      ctx.stroke();
+      if (s.label) {
+        ctx.fillStyle = s.color;
+        const tw = ctx.measureText(s.label).width;
+        ctx.fillText(s.label, (x1 + x2) / 2 - tw / 2, s.dir === 1 ? y - 4 : y + 12);
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+</script>
+<script>
+/* SMC-скринер: рейтинг волатильных монет + авторазметка + сетка сетапов (слом структуры / пробой) */
+const $ = s => document.querySelector(s);
+
+const state = {
+  mode: 'setups',
+  symbol: null,
+  top: [],
+  n: 5,
+  minTurnover: 30e6,
+  busy: false,
+  queued: false,
+  formations: [],
+};
+
+const charts = {};
+
+const VIEWS = {
+  setups: '#viewSetups',
+  m15: '#viewM15',
+  m5: '#viewM5',
+  m1: '#viewM1',
+};
+
+/* ---------- слои графика (что показывать) ---------- */
+const LAYER_DEFS = [
+  ['ob', 'Ордер-блоки'], ['fvg', 'FVG'], ['liq', '$$$ ликвидность'],
+  ['struct', 'BOS/ЧоЧ'], ['sfp', 'SFP'], ['knives', 'Ножи'],
+  ['bands', 'Премиум/дисконт'], ['extremes', 'Хай/лой'],
+  ['walls', 'Стены стакана'], ['consol', 'Сжатие'],
+];
+const LAYERS = Object.assign(
+  Object.fromEntries(LAYER_DEFS.map(([k]) => [k, true])),
+  JSON.parse(localStorage.getItem('smc_layers') || '{}'),
+);
+function saveLayers() { localStorage.setItem('smc_layers', JSON.stringify(LAYERS)); }
+
+const TF_CFG = {
+  m15: { interval: '15', minPerBar: 15, label: '15M', limit: 400, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
+  m5: { interval: '5', minPerBar: 5, label: '5M', limit: 300, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
+  m1: { interval: '1', minPerBar: 1, label: '1M', limit: 300, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
+};
+
+/* ---------- форматирование ---------- */
+const fmtUsd = v => v >= 1e9 ? '$' + (v / 1e9).toFixed(1) + 'B'
+  : v >= 1e6 ? '$' + (v / 1e6).toFixed(0) + 'M'
+  : '$' + (v / 1e3).toFixed(0) + 'K';
+const fmtPct = v => (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+const fmtFund = v => (v > 0 ? '+' : '') + (v * 100).toFixed(3) + '%';
+const fmtPrice = (v) => {
+  const p = v < 0.0001 ? 8 : v < 0.001 ? 7 : v < 0.01 ? 6 : v < 0.1 ? 5 : v < 1 ? 4 : v < 100 ? 3 : 2;
+  return v.toFixed(p);
+};
+
+/* ---------- кэш свечей ---------- */
+const klineCache = new Map();
+async function klines(sym, interval, limit) {
+  const key = `${sym}:${interval}`;
+  const hit = klineCache.get(key);
+  if (hit && Date.now() - hit.ts < 25000 && hit.data.length >= limit * 0.9) return hit.data;
+  const data = await API.klines(sym, interval, limit);
+  klineCache.set(key, { ts: Date.now(), data });
+  return data;
+}
+
+function fundingOf(sym) {
+  const r = state.top.find(r => r.sym === sym);
+  return r ? r.fr : null;
+}
+
+/* ---------- сборка разметки ---------- */
+function buildDrawings(cs, A, { bands = false, maxOB = 3, maxFVG = 4, maxEvents = 6, extremes = false } = {}) {
+  const zones = [], hlines = [], slines = [], bandsArr = [];
+  const last = cs.length - 1;
+  if (!LAYERS.ob) maxOB = 0;
+  if (!LAYERS.fvg) maxFVG = 0;
+  if (!LAYERS.struct) maxEvents = 0;
+  if (!LAYERS.bands) bands = false;
+  if (!LAYERS.extremes) extremes = false;
+
+  if (bands && A.range) {
+    bandsArr.push({ top: A.range.high, bottom: A.range.eq, fill: 'rgba(239,83,80,0.045)', label: 'премиум', color: 'rgba(239,83,80,0.55)' });
+    bandsArr.push({ top: A.range.eq, bottom: A.range.low, fill: 'rgba(38,166,154,0.045)', label: 'дисконт', color: 'rgba(38,166,154,0.55)' });
+    hlines.push({ price: A.range.eq, color: 'rgba(139,148,158,0.5)', dash: [4, 4], label: 'EQ 50%' });
+  }
+
+  for (const lv of (LAYERS.liq ? A.levels : [])) {
+    if (lv.swept && last - lv.sweptAt > 25) continue;
+    const col = lv.swept ? 'rgba(139,148,158,0.55)' : '#e3b341';
+    hlines.push({
+      price: lv.price, i0: lv.i0, color: col, dash: [6, 4], width: lv.swept ? 1 : 1.5,
+      label: `$$$ ${lv.kind}×${lv.count}${lv.swept ? ' (снята)' : ''}`,
+    });
+  }
+
+  let bullN = 0, bearN = 0;
+  for (let k = A.obs.length - 1; k >= 0; k--) {
+    const ob = A.obs[k];
+    if (ob.dir === 1 && bullN >= maxOB) continue;
+    if (ob.dir === -1 && bearN >= maxOB) continue;
+    if (ob.dir === 1) bullN++; else bearN++;
+    const base = ob.dir === 1 ? '38,166,154' : '239,83,80';
+    let label = 'OB' + (ob.touched ? ' (тест)' : '');
+    if (bands && A.range && !ob.touched) {
+      if (ob.dir === 1 && ob.top <= A.range.eq) label = 'OB ★ POI';
+      if (ob.dir === -1 && ob.bottom >= A.range.eq) label = 'OB ★ POI';
+    }
+    zones.push({
+      i0: ob.i, i1: null, top: ob.top, bottom: ob.bottom,
+      fill: `rgba(${base},${ob.touched ? 0.07 : 0.14})`,
+      stroke: `rgba(${base},${ob.touched ? 0.35 : 0.7})`,
+      label,
+    });
+  }
+
+  for (const f of A.fvgs.slice(-maxFVG)) {
+    zones.push({
+      i0: f.i, i1: null, top: f.curTop, bottom: f.curBottom,
+      fill: 'rgba(171,130,255,0.10)', stroke: 'rgba(171,130,255,0.45)', dash: [3, 3], label: 'FVG',
+    });
+  }
+
+  for (const ev of A.events.slice(-maxEvents)) {
+    const col = ev.type === 'CHOCH' ? '#f0883e' : (ev.dir === 1 ? '#26a69a' : '#ef5350');
+    slines.push({ i0: ev.from, i1: ev.at, price: ev.level, color: col, dir: ev.dir, label: ev.type === 'CHOCH' ? 'ЧоЧ' : 'BOS' });
+  }
+
+  if (A.consol && LAYERS.consol) {
+    zones.push({
+      i0: A.consol.i0, i1: null, top: A.consol.top, bottom: A.consol.bottom,
+      fill: 'rgba(88,166,255,0.06)', stroke: 'rgba(88,166,255,0.55)', dash: [5, 3], label: 'сжатие',
+    });
+  }
+
+  if (extremes) {
+    const from = Math.max(0, cs.length - 200);
+    let hiI = from, loI = from;
+    for (let i = from; i < cs.length; i++) {
+      if (cs[i].h > cs[hiI].h) hiI = i;
+      if (cs[i].l < cs[loI].l) loI = i;
+    }
+    hlines.push({ price: cs[hiI].h, i0: hiI, color: 'rgba(239,83,80,0.75)', label: 'хай' });
+    hlines.push({ price: cs[loI].l, i0: loI, color: 'rgba(38,166,154,0.75)', label: 'лой' });
+  }
+
+  return { zones, hlines, slines, bands: bandsArr };
+}
+
+function wallLines(m) {
+  if (!m || !m.walls || !LAYERS.walls) return [];
+  return m.walls.slice(0, 4).map(w => ({
+    price: w.price,
+    color: w.side === 'bid' ? 'rgba(63,185,80,0.85)' : 'rgba(248,81,73,0.85)',
+    width: 2,
+    label: `СТЕНА ${w.side === 'bid' ? 'БИД' : 'АСК'} ${fmtUsd(w.usd)}`,
+  }));
+}
+
+function buildMarkers(cs, A, { sweeps = true, knives = true } = {}) {
+  const ms = [];
+  if (!LAYERS.sfp) sweeps = false;
+  if (!LAYERS.knives) knives = false;
+  if (sweeps) for (const s of A.sweeps) {
+    ms.push({
+      time: cs[s.i].t,
+      position: s.dir === 1 ? 'belowBar' : 'aboveBar',
+      color: '#e3b341',
+      shape: s.dir === 1 ? 'arrowUp' : 'arrowDown',
+      text: 'SFP',
+    });
+  }
+  if (knives) for (const k of A.knives) {
+    ms.push({
+      time: cs[k.i].t,
+      position: k.dir === -1 ? 'belowBar' : 'aboveBar',
+      color: '#58a6ff', shape: 'circle', text: 'нож',
+    });
+  }
+  return ms;
+}
+
+/* ---------- сводки ---------- */
+function trendWord(A) {
+  const ev = A.events[A.events.length - 1];
+  if (!ev) return 'структура не определена';
+  const dir = A.trend === 1 ? 'бычья' : 'медвежья';
+  return `${dir} (посл. ${ev.type === 'CHOCH' ? 'ЧоЧ' : 'BOS'}${ev.dir === 1 ? '↑' : '↓'})`;
+}
+
+function nearestLiquidity(A, price) {
+  let below = null, above = null;
+  for (const lv of A.levels) {
+    if (lv.swept) continue;
+    if (lv.kind === 'EQL' && lv.price < price && (!below || lv.price > below.price)) below = lv;
+    if (lv.kind === 'EQH' && lv.price > price && (!above || lv.price < above.price)) above = lv;
+  }
+  return { below, above };
+}
+
+function metricItems(m) {
+  const items = [];
+  if (!m) return items;
+  if (m.funding != null) items.push(`<b>фандинг:</b> ${fmtFund(m.funding)} ${m.funding > 0.0003 ? '(толпа в лонгах)' : m.funding < -0.0003 ? '(толпа в шортах)' : ''}`);
+  if (m.oiChg != null) items.push(`<b>OI за 4ч:</b> ${fmtPct(m.oiChg)}`);
+  if (m.ls != null) items.push(`<b>L/S:</b> ${m.ls.toFixed(2)}`);
+  return items;
+}
+
+function tfSummary(cs, A, label, minPerBar, m) {
+  const price = cs[cs.length - 1].c;
+  const last = cs.length - 1;
+  const items = [];
+  items.push(`<b>${label} структура:</b> ${trendWord(A)}`);
+  if (A.range) {
+    const pct = Math.round((price - A.range.low) / (A.range.high - A.range.low) * 100);
+    items.push(`<b>в диапазоне:</b> ${pct}% — ${pct >= 50 ? 'премиум' : 'дисконт'}`);
+  }
+  if (A.consol) items.push('<b>сжатие:</b> да — жди пробой');
+  const lq = nearestLiquidity(A, price);
+  if (lq.below) items.push(`<b>ликвидность за лоями:</b> ${fmtPrice(lq.below.price)} (EQL×${lq.below.count})`);
+  if (lq.above) items.push(`<b>ликвидность за хаями:</b> ${fmtPrice(lq.above.price)} (EQH×${lq.above.count})`);
+  const sw = A.sweeps[A.sweeps.length - 1];
+  if (sw && (last - sw.i) * minPerBar <= 45) {
+    items.push(`<b>снятие (SFP):</b> ${(last - sw.i) * minPerBar} мин назад, ${sw.dir === 1 ? 'лой снят → смотрим лонг' : 'хай снят → смотрим шорт'}`);
+  }
+  const kn = A.knives[A.knives.length - 1];
+  if (kn && (last - kn.i) * minPerBar <= 45) items.push(`<b>нож:</b> ${(last - kn.i) * minPerBar} мин назад (${kn.dir === -1 ? 'вниз' : 'вверх'})`);
+  return items.concat(metricItems(m));
+}
+
+/* ---------- формации: слом структуры и пробой сжатия ---------- */
+function detectFormations(sym, tfKey, cs, A) {
+  const res = [];
+  const last = cs.length - 1;
+  if (last < 60) return res;
+  const price = cs[last].c;
+  const atr = A.atr[last] || 0;
+  if (!atr) return res;
+  const mpb = TF_CFG[tfKey].minPerBar;
+
+  // оконные экстремумы — дальняя цель
+  const from = Math.max(0, cs.length - 200);
+  let hi = -Infinity, lo = Infinity;
+  for (let i = from; i <= last; i++) { hi = Math.max(hi, cs[i].h); lo = Math.min(lo, cs[i].l); }
+
+  // СЛОМ СТРУКТУРЫ: свежий ЧоЧ, вход — ретест уровня слома
+  const ev = [...A.events].reverse().find(e => e.type === 'CHOCH' && last - e.at <= 20);
+  if (ev) {
+    const dir = ev.dir;
+    let ext = dir === 1 ? Infinity : -Infinity;
+    for (let i = Math.max(0, ev.from - 3); i <= Math.min(last, ev.at); i++) {
+      ext = dir === 1 ? Math.min(ext, cs[i].l) : Math.max(ext, cs[i].h);
+    }
+    const stop = dir === 1 ? ext - 0.3 * atr : ext + 0.3 * atr;
+    const entry = ev.level;
+    const risk = Math.abs(entry - stop);
+    const lq = A.levels
+      .filter(l => !l.swept && (dir === 1 ? (l.kind === 'EQH' && l.price > price) : (l.kind === 'EQL' && l.price < price)))
+      .sort((a, b) => dir === 1 ? a.price - b.price : b.price - a.price);
+    const tp1 = lq[0] ? lq[0].price : entry + (dir === 1 ? 2 : -2) * risk;
+    const tp1src = lq[0] ? `ликвидность EQ${dir === 1 ? 'H' : 'L'}×${lq[0].count}` : 'расчёт 2R';
+    const tp2 = lq[1] ? lq[1].price : (dir === 1 ? hi : lo);
+    const tp2src = lq[1] ? `ликвидность EQ${dir === 1 ? 'H' : 'L'}×${lq[1].count}` : (dir === 1 ? 'хай окна' : 'лой окна');
+    const rr1 = risk > 0 ? Math.abs(tp1 - entry) / risk : 0;
+    if (risk > 0 && rr1 >= 0.8 && (dir === 1 ? tp1 > entry : tp1 < entry)) {
+      res.push({
+        key: `${sym}|${tfKey}|choch`, kind: 'choch', sym, tfKey, dir,
+        entry, stop, tp1, tp1src, tp2, tp2src, rr1,
+        agoMin: (last - ev.at) * mpb, ev,
+        prio: (last - ev.at) <= 8 ? 0 : 1,
+        cs, A,
+      });
+    }
+  }
+
+  // ПРОБОЙ: сжатие у ликвидности — торгуется выход из бокса
+  if (A.consol) {
+    const box = A.consol;
+    const h = box.top - box.bottom;
+    const up = A.levels.filter(l => !l.swept && l.kind === 'EQH' && l.price > box.top).sort((a, b) => a.price - b.price)[0];
+    const dn = A.levels.filter(l => !l.swept && l.kind === 'EQL' && l.price < box.bottom).sort((a, b) => b.price - a.price)[0];
+    res.push({
+      key: `${sym}|${tfKey}|break`, kind: 'break', sym, tfKey, box,
+      tpUp: up ? up.price : box.top + 2 * h,
+      tpUpSrc: up ? `EQH×${up.count}` : 'бокс ×2',
+      tpDn: dn ? dn.price : box.bottom - 2 * h,
+      tpDnSrc: dn ? `EQL×${dn.count}` : 'бокс ×2',
+      prio: 0.5,
+      cs, A,
+    });
+  }
+  return res;
+}
+
+async function scanFormations() {
+  const out = [];
+  for (const r of state.top) {
+    try {
+      const [c15, c5] = await Promise.all([klines(r.sym, '15', 300), klines(r.sym, '5', 300)]);
+      for (const [tfKey, cs] of [['m15', c15], ['m5', c5]]) {
+        const A = SMC.analyze(cs, TF_CFG[tfKey].opts);
+        for (const f of detectFormations(r.sym, tfKey, cs, A)) {
+          f.coinRank = state.top.indexOf(r);
+          out.push(f);
+        }
+      }
+    } catch (e) { /* монета пропускается */ }
+  }
+  out.sort((a, b) => a.prio - b.prio || a.coinRank - b.coinRank);
+  state.formations = out.slice(0, 8);
+}
+
+/* ---------- сетка карточек формаций ---------- */
+const formPool = new Map(); // key -> {el, cv}
+
+function formationHead(f) {
+  if (f.kind === 'choch') {
+    const d = f.dir === 1 ? '↑' : '↓';
+    return `<span class="fbadge ${f.dir === 1 ? 'long' : 'short'}">СЛОМ ${d}</span>
+      <b>${f.sym.replace('USDT', '')}</b><span class="sc-tf">${TF_CFG[f.tfKey].label}</span>
+      <span class="fago">${f.agoMin} мин назад</span>
+      <span class="fopen">развернуть ↗</span>`;
+  }
+  return `<span class="fbadge break">ПРОБОЙ</span>
+    <b>${f.sym.replace('USDT', '')}</b><span class="sc-tf">${TF_CFG[f.tfKey].label}</span>
+    <span class="fago">сжатие сейчас</span>
+    <span class="fopen">развернуть ↗</span>`;
+}
+
+function formationFoot(f) {
+  if (f.kind === 'choch') {
+    return `<span>вход (ретест): <b>${fmtPrice(f.entry)}</b></span>
+      <span class="stop">стоп: ${fmtPrice(f.stop)}</span>
+      <span class="tp">цель 1: ${fmtPrice(f.tp1)} <i>(${f.tp1src})</i></span>
+      <span class="tp">цель 2: ${fmtPrice(f.tp2)} <i>(${f.tp2src})</i></span>
+      <span>R:R 1:${f.rr1.toFixed(1)}</span>`;
+  }
+  return `<span>бокс: <b>${fmtPrice(f.box.bottom)}–${fmtPrice(f.box.top)}</b></span>
+    <span class="tp">↑ цель: ${fmtPrice(f.tpUp)} <i>(${f.tpUpSrc})</i></span>
+    <span class="tp">↓ цель: ${fmtPrice(f.tpDn)} <i>(${f.tpDnSrc})</i></span>
+    <span class="stop">стоп — за другой стороной бокса</span>`;
+}
+
+function formationDrawings(f) {
+  const zones = [], hlines = [], slines = [];
+  if (f.kind === 'choch') {
+    slines.push({ i0: f.ev.from, i1: f.ev.at, price: f.ev.level, color: '#f0883e', dir: f.ev.dir, label: 'ЧоЧ' });
+    hlines.push({ price: f.entry, color: '#58a6ff', width: 1.5, label: 'ВХОД ' + fmtPrice(f.entry) });
+    hlines.push({ price: f.stop, color: '#f85149', width: 1.5, label: 'СТОП ' + fmtPrice(f.stop) });
+    hlines.push({ price: f.tp1, color: '#3fb950', dash: [6, 4], width: 1.5, label: 'ЦЕЛЬ 1' });
+    hlines.push({ price: f.tp2, color: '#3fb950', dash: [2, 3], label: 'ЦЕЛЬ 2' });
+  } else {
+    zones.push({
+      i0: f.box.i0, i1: null, top: f.box.top, bottom: f.box.bottom,
+      fill: 'rgba(88,166,255,0.10)', stroke: '#58a6ff', dash: [5, 3], label: 'сжатие',
+    });
+    hlines.push({ price: f.tpUp, color: '#3fb950', dash: [6, 4], width: 1.5, label: '↑ ЦЕЛЬ ' + fmtPrice(f.tpUp) });
+    hlines.push({ price: f.tpDn, color: '#3fb950', dash: [6, 4], width: 1.5, label: '↓ ЦЕЛЬ ' + fmtPrice(f.tpDn) });
+  }
+  // ликвидность для контекста
+  const last = f.cs.length - 1;
+  for (const lv of f.A.levels) {
+    if (lv.swept) continue;
+    hlines.push({ price: lv.price, i0: lv.i0, color: '#e3b341', dash: [6, 4], label: `$$$ ${lv.kind}×${lv.count}` });
+  }
+  return { zones, hlines, slines, bands: [] };
+}
+
+function renderFormations() {
+  const grid = $('#setupGrid');
+  const keys = new Set(state.formations.map(f => f.key));
+  for (const [k, o] of [...formPool]) {
+    if (!keys.has(k)) { o.el.remove(); formPool.delete(k); }
+  }
+  let empty = grid.querySelector('.sc-empty');
+  if (!state.formations.length) {
+    if (!empty) {
+      empty = document.createElement('div');
+      empty.className = 'sc-empty';
+      empty.textContent = 'Формаций сейчас нет: ни свежих сломов структуры, ни сжатий на топ-монетах. Это нормально — жди, скан обновляется сам.';
+      grid.appendChild(empty);
+    }
+    return;
+  }
+  if (empty) empty.remove();
+
+  for (const f of state.formations) {
+    let o = formPool.get(f.key);
+    if (!o) {
+      const el = document.createElement('div');
+      el.className = 'fcard';
+      el.dataset.key = f.key;
+      el.innerHTML = '<div class="fhead"></div><div class="fchart"></div><div class="ffoot"></div>';
+      grid.appendChild(el);
+      o = { el, cv: new ChartView(el.querySelector('.fchart')) };
+      formPool.set(f.key, o);
+    }
+    grid.appendChild(o.el); // порядок = ранг
+    o.el.querySelector('.fhead').innerHTML = formationHead(f);
+    o.el.querySelector('.ffoot').innerHTML = formationFoot(f);
+    const price = f.cs[f.cs.length - 1].c;
+    o.cv.setPrecision(price);
+    o.cv.setTitle('');
+    o.cv.setData(f.cs.slice(-160), { fit: true });
+    o.cv.setDrawings(formationDrawings(f));
+    o.cv.setMarkers([]);
+  }
+}
+
+/* ---------- рейтинг ---------- */
+async function loadRanking() {
+  try {
+    const list = await API.tickers();
+    const rows = list
+      .filter(t => t.symbol.endsWith('USDT'))
+      .map(t => ({
+        sym: t.symbol,
+        last: +t.lastPrice,
+        chg: +t.price24hPcnt * 100,
+        vol: (+t.highPrice24h - +t.lowPrice24h) / (+t.lastPrice || 1) * 100,
+        to: +t.turnover24h,
+        fr: +t.fundingRate,
+        oiv: +t.openInterestValue,
+        chips: null,
+      }))
+      .filter(r => r.to >= state.minTurnover && r.vol > 0 && isFinite(r.vol));
+    rows.forEach(r => { r.score = r.vol * Math.log10(Math.max(10, r.to)); });
+    rows.sort((a, b) => b.score - a.score);
+    state.top = rows.slice(0, state.n);
+    renderSidebar();
+    setStatus('обновлено ' + new Date().toLocaleTimeString());
+    if (!state.symbol && state.top.length) selectSymbol(state.top[0].sym);
+    fetchBadges();
+  } catch (e) {
+    setStatus('ошибка: ' + e.message, true);
+  }
+}
+
+async function fetchBadges() {
+  for (const r of state.top) {
+    try {
+      const cs = await klines(r.sym, '1', 240);
+      const A = SMC.analyze(cs, { sweepLb: 60, knifeLb: 60, consolWin: 30 });
+      const last = cs.length - 1;
+      const chips = [];
+      const eqls = A.levels.filter(l => !l.swept && l.kind === 'EQL');
+      const eqhs = A.levels.filter(l => !l.swept && l.kind === 'EQH');
+      if (eqls.length) chips.push({ t: `EQL×${eqls.reduce((s, l) => s + l.count, 0)}`, c: 'gold' });
+      if (eqhs.length) chips.push({ t: `EQH×${eqhs.reduce((s, l) => s + l.count, 0)}`, c: 'gold' });
+      if (A.consol) chips.push({ t: 'сжатие', c: 'blue' });
+      const sw = A.sweeps[A.sweeps.length - 1];
+      if (sw && last - sw.i <= 30) chips.push({ t: 'SFP', c: 'gold' });
+      const kn = A.knives[A.knives.length - 1];
+      if (kn && last - kn.i <= 30) chips.push({ t: 'нож', c: 'blue' });
+      const ev = A.events[A.events.length - 1];
+      if (ev && ev.type === 'CHOCH' && last - ev.at <= 40) chips.push({ t: 'ЧоЧ', c: 'orange' });
+      r.chips = chips;
+    } catch (e) { r.chips = []; }
+  }
+  renderSidebar();
+}
+
+function renderSidebar() {
+  const el = $('#sidebar');
+  el.innerHTML = state.top.map((r, idx) => `
+    <div class="coin ${r.sym === state.symbol ? 'active' : ''}" data-sym="${r.sym}">
+      <div class="row1">
+        <span class="rank">${idx + 1}</span>
+        <b>${r.sym.replace('USDT', '')}</b>
+        <span class="chg ${r.chg >= 0 ? 'pos' : 'neg'}">${fmtPct(r.chg)}</span>
+      </div>
+      <div class="row2">
+        <span>${fmtPrice(r.last)}</span>
+        <span title="Оборот за 24ч">${fmtUsd(r.to)}</span>
+        <span title="Диапазон за 24ч">Δ${r.vol.toFixed(1)}%</span>
+      </div>
+      <div class="row2 row3">
+        <span class="${Math.abs(r.fr) >= 0.0003 ? 'hot' : ''}" title="Ставка фандинга">F ${fmtFund(r.fr)}</span>
+        <span title="Открытый интерес">OI ${fmtUsd(r.oiv)}</span>
+      </div>
+      <div class="chips">${(r.chips || []).map(c => `<span class="chip ${c.c}">${c.t}</span>`).join('')}
+        ${r.chips === null ? '<span class="chip dim">анализ…</span>' : ''}
+        ${r.chips && !r.chips.length ? '<span class="chip dim">чисто</span>' : ''}
+      </div>
+    </div>`).join('');
+}
+
+/* ---------- графики ---------- */
+function selectSymbol(sym) {
+  state.symbol = sym;
+  renderSidebar();
+  $('#curSym').textContent = sym;
+  $('#lnkTV').href = `https://www.tradingview.com/chart/?symbol=BYBIT%3A${sym}.P`;
+  $('#lnkBB').href = `https://www.bybit.com/trade/usdt/${sym}`;
+  refreshCharts(true);
+}
+
+async function refreshCharts(fit = false) {
+  if (!state.symbol) return;
+  if (state.busy) { state.queued = state.queued || fit; return; }
+  state.busy = true;
+  const sym = state.symbol, mode = state.mode;
+  const stale = () => {
+    if (state.symbol === sym && state.mode === mode) return false;
+    state.queued = true;
+    return true;
+  };
+  try {
+    if (mode === 'setups') {
+      await scanFormations();
+      if (stale()) return;
+      renderFormations();
+      renderSummary([
+        `<b>формации:</b> свежий слом структуры (ЧоЧ) и сжатие под пробой, по топ-монетам на 15M и 5M`,
+        `<b>найдено:</b> ${state.formations.length}`,
+        `<b>клик по карточке</b> — открыть монету на её таймфрейме`,
+      ]);
+    } else {
+      const cfg = TF_CFG[mode];
+      const cs = await klines(sym, cfg.interval, cfg.limit);
+      if (stale()) return;
+      const A = SMC.analyze(cs, cfg.opts);
+      const price = cs[cs.length - 1].c;
+      let m = null;
+      try { m = await Metrics.get(sym, fundingOf(sym)); } catch (e) {}
+      const cv = charts[{ m15: 'tf15', m5: 'tf5', m1: 'tf1' }[mode]];
+      cv.setPrecision(price);
+      cv.setTitle(`${sym} · ${cfg.label}`);
+      cv.setData(cs, { fit });
+      const d = buildDrawings(cs, A, { bands: mode === 'm15', maxOB: 3, maxFVG: 4, maxEvents: 6, extremes: mode !== 'm15' });
+      d.hlines.push(...wallLines(m));
+      cv.setDrawings(d);
+      cv.setMarkers(buildMarkers(cs, A));
+      renderSummary(tfSummary(cs, A, cfg.label, cfg.minPerBar, m));
+    }
+    setStatus('обновлено ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    setStatus('ошибка: ' + e.message, true);
+  } finally {
+    state.busy = false;
+    if (state.queued) {
+      const f = state.queued === true;
+      state.queued = false;
+      refreshCharts(f);
+    }
+  }
+}
+
+function renderSummary(items) {
+  $('#summary').innerHTML = items.map(i => `<span class="sumitem">${i}</span>`).join('');
+}
+
+function renderLayerBar() {
+  $('#layerBar').innerHTML = 'Слои: ' + LAYER_DEFS.map(([k, label]) =>
+    `<span class="lchip ${LAYERS[k] ? 'on' : ''}" data-layer="${k}">${label}</span>`).join('');
+}
+
+function setStatus(msg, err = false) {
+  const el = $('#status');
+  el.textContent = msg;
+  el.classList.toggle('err', err);
+}
+
+/* ---------- инициализация ---------- */
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  for (const [m, sel] of Object.entries(VIEWS)) $(sel).hidden = m !== mode;
+  refreshCharts(true);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  charts.tf15 = new ChartView($('#chartTf15'));
+  charts.tf5 = new ChartView($('#chartTf5'));
+  charts.tf1 = new ChartView($('#chartTf1'));
+
+  $('#sidebar').addEventListener('click', e => {
+    const c = e.target.closest('.coin');
+    if (c) selectSymbol(c.dataset.sym);
+  });
+
+  // карточка формации: клик по шапке/подвалу — открыть монету на её ТФ
+  $('#setupGrid').addEventListener('click', e => {
+    if (e.target.closest('.fchart')) return; // не мешаем скроллить график
+    const card = e.target.closest('.fcard');
+    if (!card) return;
+    const f = state.formations.find(x => x.key === card.dataset.key);
+    if (!f) return;
+    state.symbol = f.sym;
+    $('#curSym').textContent = f.sym;
+    $('#lnkTV').href = `https://www.tradingview.com/chart/?symbol=BYBIT%3A${f.sym}.P`;
+    $('#lnkBB').href = `https://www.bybit.com/trade/usdt/${f.sym}`;
+    renderSidebar();
+    setMode(f.tfKey);
+  });
+
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('#selN').addEventListener('change', e => { state.n = +e.target.value; loadRanking(); });
+  $('#selTo').addEventListener('change', e => { state.minTurnover = +e.target.value; loadRanking(); });
+  $('#btnRefresh').addEventListener('click', () => { loadRanking(); refreshCharts(false); });
+
+  renderLayerBar();
+  $('#layerBar').addEventListener('click', e => {
+    const chip = e.target.closest('.lchip');
+    if (!chip) return;
+    LAYERS[chip.dataset.layer] = !LAYERS[chip.dataset.layer];
+    saveLayers();
+    renderLayerBar();
+    refreshCharts(false);
+  });
+
+  loadRanking();
+  setInterval(() => refreshCharts(false), 25000);
+  setInterval(loadRanking, 90000);
+});
+
+</script>
+<script>
+(function(){
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (tg && tg.platform && tg.platform !== 'unknown') {
+    try {
+      tg.ready();
+      tg.expand();
+      if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+    } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>
