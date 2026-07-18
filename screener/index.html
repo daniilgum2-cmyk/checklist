@@ -427,8 +427,7 @@ footer {
 <header>
   <div class="brand">SMC-скринер <span class="sub">Bybit Futures</span></div>
   <nav class="tabs">
-    <button data-mode="setups" class="active">⚡ Сетапы</button>
-    <button data-mode="m15">15M</button>
+    <button data-mode="m15" class="active">15M</button>
     <button data-mode="m5">5M</button>
     <button data-mode="m1">1M</button>
   </nav>
@@ -462,10 +461,7 @@ footer {
     </div>
     <div id="layerBar"></div>
     <div id="summary"></div>
-    <section id="viewSetups" class="charts">
-      <div id="setupGrid"></div>
-    </section>
-    <section id="viewM15" class="charts" hidden>
+    <section id="viewM15" class="charts">
       <div class="chartWrap"><div class="chart" id="chartTf15"></div></div>
     </section>
     <section id="viewM5" class="charts" hidden>
@@ -1585,7 +1581,7 @@ class DrawTools {
 const $ = s => document.querySelector(s);
 
 const state = {
-  mode: 'setups',
+  mode: 'm15',
   symbol: null,
   top: [],
   n: 5,
@@ -1598,7 +1594,6 @@ const state = {
 const charts = {};
 
 const VIEWS = {
-  setups: '#viewSetups',
   m15: '#viewM15',
   m5: '#viewM5',
   m1: '#viewM1',
@@ -2161,21 +2156,6 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#sidebar').addEventListener('click', e => {
     const c = e.target.closest('.coin');
     if (c) selectSymbol(c.dataset.sym);
-  });
-
-  // карточка формации: клик по шапке/подвалу — открыть монету на её ТФ
-  $('#setupGrid').addEventListener('click', e => {
-    if (e.target.closest('.fchart')) return; // не мешаем скроллить график
-    const card = e.target.closest('.fcard');
-    if (!card) return;
-    const f = state.formations.find(x => x.key === card.dataset.key);
-    if (!f) return;
-    state.symbol = f.sym;
-    $('#curSym').textContent = f.sym;
-    $('#lnkTV').href = `https://www.tradingview.com/chart/?symbol=BYBIT%3A${f.sym}.P`;
-    $('#lnkBB').href = `https://www.bybit.com/trade/usdt/${f.sym}`;
-    renderSidebar();
-    setMode(f.tfKey);
   });
 
   document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
