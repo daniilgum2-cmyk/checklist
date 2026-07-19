@@ -421,6 +421,15 @@ footer {
   .draw-toolbar button { width: 38px; height: 38px; font-size: 17px; }
 }
 
+/* поле ввода для текста-заметки */
+.draw-text-input {
+  position: absolute; z-index: 7;
+  background: rgba(13,17,23,0.95); color: #e6edf3;
+  border: 1px solid #58a6ff; border-radius: 4px;
+  font: 12px -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: 2px 6px; outline: none; min-width: 120px;
+}
+
 </style>
 </head>
 <body>
@@ -1051,9 +1060,10 @@ class ChartView {
 
 </script>
 <script>
-/* Инструменты рисования поверх графика (стиль TradingView):
-   курсор (выбор/перенос), линия тренда, горизонтальный уровень, линейка,
-   кисть, лонг/шорт позиция (3 клика: вход → тейк → стоп).
+/* Инструменты рисования поверх графика (стиль TradingView/digash):
+   курсор, магнит (привязка к свечам), линия тренда, луч, горизонтальный
+   уровень, вертикаль, прямоугольник/зона, линейка, кисть (гладкая),
+   текст-заметка, лонг/шорт позиция.
    Рисунки хранятся в localStorage по символу (координаты время+цена),
    поэтому переживают обновление свечей и видны на всех таймфреймах. */
 const DRAW_STORE = 'smc_drawings_v1';
@@ -1063,6 +1073,7 @@ class DrawTools {
     this.cv = cv;
     this.symbol = null;
     this.tool = 'cursor';
+    this.magnet = true;
     this.items = [];
     this.draft = null;   // создаваемый рисунок
     this.ruler = null;   // линейка (эфемерная, не сохраняется)
@@ -1098,9 +1109,13 @@ class DrawTools {
     const tools = [
       ['cursor', '⌖', 'Курсор — выбрать, подвинуть, отредактировать'],
       ['trend', '╱', 'Линия тренда (протянуть)'],
+      ['ray', '⟶', 'Луч — линия от точки в бесконечность (протянуть)'],
       ['hline', '─', 'Горизонтальный уровень (клик по цене)'],
+      ['vline', '│', 'Вертикальная линия (клик по времени)'],
+      ['rect', '▭', 'Прямоугольник / зона (протянуть)'],
       ['ruler', '⤢', 'Линейка: измерить ход в % и барах (протянуть)'],
       ['brush', '✎', 'Кисть (рисовать от руки)'],
+      ['text', 'T', 'Текст / заметка (клик, затем ввод)'],
       ['pos', 'RR', 'Лонг/шорт позиция: 3 клика — вход, тейк, стоп'],
     ];
     this.btns = {};
@@ -1112,6 +1127,20 @@ class DrawTools {
       bar.appendChild(b);
       this.btns[id] = b;
     }
+    // магнит — переключатель, не инструмент
+    const sep0 = document.createElement('div');
+    sep0.className = 'sep';
+    bar.appendChild(sep0);
+    this.magnetBtn = document.createElement('button');
+    this.magnetBtn.textContent = '🧲';
+    this.magnetBtn.title = 'Магнит: привязка точек к свечам (хай/лой/откр/закр)';
+    this.magnetBtn.classList.toggle('active', this.magnet);
+    this.magnetBtn.addEventListener('click', () => {
+      this.magnet = !this.magnet;
+      this.magnetBtn.classList.toggle('active', this.magnet);
+    });
+    bar.appendChild(this.magnetBtn);
+
     const sep = document.createElement('div');
     sep.className = 'sep';
     bar.appendChild(sep);
@@ -1178,7 +1207,7 @@ class DrawTools {
     this.cv.requestDraw();
   }
 
-  /* ---------- координаты ---------- */
+  /* ---------- координаты и магнит ---------- */
   _iv() {
     const cs = this.cv.candles;
     return cs && cs.length > 1 ? cs[1].t - cs[0].t : 60;
@@ -1192,11 +1221,27 @@ class DrawTools {
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
-  _pt(x, y) {
+  // привязка точки к ближайшей свече: время → центр свечи, цена → ближайший из OHLC
+  _snap(pt) {
+    const cs = this.cv.candles;
+    if (!this.magnet || !cs || !cs.length) return pt;
+    let idx = Math.round((pt.t - cs[0].t) / this._iv());
+    idx = Math.max(0, Math.min(cs.length - 1, idx));
+    const c = cs[idx];
+    let best = c.o;
+    for (const v of [c.o, c.h, c.l, c.c]) {
+      if (Math.abs(v - pt.price) < Math.abs(best - pt.price)) best = v;
+    }
+    return { t: c.t, price: best };
+  }
+
+  _pt(x, y, snap = true) {
     const l = this.cv.chart.timeScale().coordinateToLogical(x);
     const price = this.cv.series.coordinateToPrice(y);
     if (l == null || price == null) return null;
-    return { t: this._l2t(l), price };
+    let pt = { t: this._l2t(l), price };
+    if (snap) pt = this._snap(pt);
+    return pt;
   }
 
   _inPane(x, y) {
@@ -1204,6 +1249,42 @@ class DrawTools {
   }
 
   _fmt(v) { return v.toFixed(this.cv.precision || 2); }
+
+  /* ---------- текст-редактор ---------- */
+  _startTextInput(pt, x, y, existing) {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'draw-text-input';
+    inp.value = existing ? existing.text : '';
+    Object.assign(inp.style, { left: x + 'px', top: y + 'px' });
+    this.cv.el.appendChild(inp);
+    setTimeout(() => { inp.focus(); inp.select(); }, 0);
+    let done = false;
+    // finish вызывается напрямую (Enter/Escape) и по blur — не завязан только на blur
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      const v = inp.value.trim();
+      inp.remove();
+      if (save) {
+        if (existing) {
+          if (v) existing.text = v; else this.items.splice(this.items.indexOf(existing), 1);
+        } else if (v) {
+          this.items.push({ type: 'text', at: pt, text: v });
+          this.sel = this.items.length - 1;
+        }
+      }
+      this._save();
+      this.setTool('cursor');
+      this.cv.requestDraw();
+    };
+    inp.addEventListener('blur', () => finish(true));
+    inp.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+  }
 
   /* ---------- события ---------- */
   _down(e) {
@@ -1218,6 +1299,13 @@ class DrawTools {
     if (this.tool === 'cursor') {
       const hit = this._hitTest(x, y);
       if (hit) {
+        // двойной клик по тексту — редактировать
+        if (this.items[hit.i].type === 'text' && e.detail >= 2) {
+          const m = this._screen({});
+          this._startTextInput(null, m.X(this.items[hit.i].at.t), m.yOf(this.items[hit.i].at.price) - 10, this.items[hit.i]);
+          e.preventDefault(); e.stopPropagation();
+          return;
+        }
         this.sel = hit.i;
         this.drag = { i: hit.i, handle: hit.handle, x0: x, y0: y,
                       orig: JSON.parse(JSON.stringify(this.items[hit.i])) };
@@ -1238,12 +1326,23 @@ class DrawTools {
       this.sel = this.items.length - 1;
       this._save();
       this.setTool('cursor');
+    } else if (this.tool === 'vline') {
+      this.items.push({ type: 'vline', t: pt.t });
+      this.sel = this.items.length - 1;
+      this._save();
+      this.setTool('cursor');
     } else if (this.tool === 'trend') {
       this.draft = { type: 'trend', p1: pt, p2: pt };
+    } else if (this.tool === 'ray') {
+      this.draft = { type: 'ray', p1: pt, p2: pt };
+    } else if (this.tool === 'rect') {
+      this.draft = { type: 'rect', p1: pt, p2: pt };
     } else if (this.tool === 'ruler') {
       this.draft = { type: 'ruler', p1: pt, p2: pt };
     } else if (this.tool === 'brush') {
-      this.draft = { type: 'brush', pts: [pt] };
+      this.draft = { type: 'brush', pts: [this._pt(x, y, false)] };
+    } else if (this.tool === 'text') {
+      this._startTextInput(pt, x, y - 10, null);
     } else if (this.tool === 'pos') {
       if (!this.draft) {
         this.draft = { type: 'pos', stage: 1, entry: pt, hover: pt };
@@ -1268,9 +1367,9 @@ class DrawTools {
   _move(e) {
     if (!this.cv.candles) return;
     const { x, y } = this._xy(e);
-    const pt = this._pt(
-      Math.min(Math.max(x, 0), this.cv._paneW()),
-      Math.min(Math.max(y, 0), this.cv._paneH()));
+    const cx = Math.min(Math.max(x, 0), this.cv._paneW());
+    const cy = Math.min(Math.max(y, 0), this.cv._paneH());
+    const pt = this._pt(cx, cy);
     if (!pt) return;
 
     if (this.drag) {
@@ -1287,9 +1386,17 @@ class DrawTools {
     }
     if (!this.draft) return;
     const d = this.draft;
-    if (d.type === 'trend' || d.type === 'ruler') d.p2 = pt;
-    else if (d.type === 'brush') d.pts.push(pt);
-    else if (d.type === 'pos') d.hover = pt;
+    if (d.type === 'trend' || d.type === 'ray' || d.type === 'rect' || d.type === 'ruler') {
+      d.p2 = pt;
+    } else if (d.type === 'brush') {
+      const raw = this._pt(cx, cy, false);
+      const last = d.pts[d.pts.length - 1];
+      const m = this._screen({});
+      const lx = m.X(last.t), ly = m.yOf(last.price);
+      if (lx == null || ly == null || Math.hypot(cx - lx, cy - ly) >= 2) d.pts.push(raw);
+    } else if (d.type === 'pos') {
+      d.hover = pt;
+    }
     this.cv.requestDraw();
   }
 
@@ -1301,9 +1408,17 @@ class DrawTools {
     }
     const d = this.draft;
     if (!d) return;
-    if (d.type === 'trend') {
+    if (d.type === 'trend' || d.type === 'ray') {
       if (Math.abs(d.p2.t - d.p1.t) > 0 || Math.abs(d.p2.price - d.p1.price) > 0) {
-        this.items.push({ type: 'trend', p1: d.p1, p2: d.p2 });
+        this.items.push({ type: d.type, p1: d.p1, p2: d.p2 });
+        this.sel = this.items.length - 1;
+        this._save();
+      }
+      this.draft = null;
+      this.setTool('cursor');
+    } else if (d.type === 'rect') {
+      if (Math.abs(d.p2.t - d.p1.t) > 0 && Math.abs(d.p2.price - d.p1.price) > 0) {
+        this.items.push({ type: 'rect', p1: d.p1, p2: d.p2 });
         this.sel = this.items.length - 1;
         this._save();
       }
@@ -1328,7 +1443,8 @@ class DrawTools {
 
   _applyDrag(it, o, handle, dt, dp, pt) {
     if (it.type === 'hline') { it.price = o.price + dp; return; }
-    if (it.type === 'trend') {
+    if (it.type === 'vline') { it.t = pt.t; return; }
+    if (it.type === 'trend' || it.type === 'ray') {
       if (handle === 'p1') { it.p1 = { t: pt.t, price: pt.price }; }
       else if (handle === 'p2') { it.p2 = { t: pt.t, price: pt.price }; }
       else {
@@ -1337,6 +1453,16 @@ class DrawTools {
       }
       return;
     }
+    if (it.type === 'rect') {
+      if (handle === 'p1') { it.p1 = { t: pt.t, price: pt.price }; }
+      else if (handle === 'p2') { it.p2 = { t: pt.t, price: pt.price }; }
+      else {
+        it.p1 = { t: o.p1.t + dt, price: o.p1.price + dp };
+        it.p2 = { t: o.p2.t + dt, price: o.p2.price + dp };
+      }
+      return;
+    }
+    if (it.type === 'text') { it.at = { t: pt.t, price: pt.price }; return; }
     if (it.type === 'brush') {
       it.pts = o.pts.map(p => ({ t: p.t + dt, price: p.price + dp }));
       return;
@@ -1353,11 +1479,10 @@ class DrawTools {
   }
 
   /* ---------- поиск под курсором ---------- */
-  _screen(it) {
+  _screen() {
     const xOf = this.cv._xMapper();
-    if (!xOf) return null;
     const yOf = p => this.cv.series.priceToCoordinate(p);
-    const X = t => xOf(this._t2l(t));
+    const X = t => (xOf ? xOf(this._t2l(t)) : 0);
     return { xOf, yOf, X };
   }
 
@@ -1370,22 +1495,54 @@ class DrawTools {
     return Math.hypot(x - px, y - py);
   }
 
+  _rayEnd(x1, y1, x2, y2, paneW) {
+    const dx = x2 - x1, dy = y2 - y1;
+    if (dx === 0 && dy === 0) return [x2, y2];
+    const tEdge = dx >= 0 ? (paneW - x1) / (dx || 1e-6) : (0 - x1) / dx;
+    const k = Math.max(tEdge, 1);
+    return [x1 + dx * k, y1 + dy * k];
+  }
+
   _hitTest(x, y) {
-    const m = this._screen({});
-    if (!m) return null;
+    const m = this._screen();
+    if (!m.xOf) return null;
+    const paneW = this.cv._paneW(), paneH = this.cv._paneH();
     const R = 7;
+    const ctx = this.canvas.getContext('2d');
+    ctx.font = '11px -apple-system, sans-serif';
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i];
       if (it.type === 'hline') {
         const yy = m.yOf(it.price);
         if (yy != null && Math.abs(y - yy) < R) return { i, handle: 'body' };
-      } else if (it.type === 'trend') {
+      } else if (it.type === 'vline') {
+        const xx = m.X(it.t);
+        if (Math.abs(x - xx) < R) return { i, handle: 'body' };
+      } else if (it.type === 'trend' || it.type === 'ray') {
+        const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
+        let x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
+        if (y1 == null || y2 == null) continue;
+        if (Math.hypot(x - x1, y - y1) < R) return { i, handle: 'p1' };
+        if (Math.hypot(x - x2, y - y2) < R) return { i, handle: 'p2' };
+        if (it.type === 'ray') [x2, y2] = this._rayEnd(x1, y1, x2, y2, paneW);
+        if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
+      } else if (it.type === 'rect') {
         const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
         const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
         if (y1 == null || y2 == null) continue;
         if (Math.hypot(x - x1, y - y1) < R) return { i, handle: 'p1' };
         if (Math.hypot(x - x2, y - y2) < R) return { i, handle: 'p2' };
-        if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
+        const lft = Math.min(x1, x2), rgt = Math.max(x1, x2);
+        const top = Math.min(y1, y2), bot = Math.max(y1, y2);
+        const nearBorder = (x > lft - R && x < rgt + R && (Math.abs(y - top) < R || Math.abs(y - bot) < R)) ||
+                           (y > top - R && y < bot + R && (Math.abs(x - lft) < R || Math.abs(x - rgt) < R));
+        const inside = x > lft && x < rgt && y > top && y < bot;
+        if (nearBorder || inside) return { i, handle: 'body' };
+      } else if (it.type === 'text') {
+        const tx = m.X(it.at.t), ty = m.yOf(it.at.price);
+        if (ty == null) continue;
+        const w = ctx.measureText(it.text).width;
+        if (x > tx - 3 && x < tx + w + 6 && y > ty - 16 && y < ty + 4) return { i, handle: 'body' };
       } else if (it.type === 'brush') {
         const pts = it.pts;
         for (let k = 1; k < pts.length; k++) {
@@ -1420,23 +1577,38 @@ class DrawTools {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     if (!this.cv.candles) return;
-    const m = this._screen({});
-    if (!m) return;
+    const m = this._screen();
+    if (!m.xOf) return;
     const paneW = this.cv._paneW(), paneH = this.cv._paneH();
 
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, paneW, paneH);
     ctx.clip();
-    ctx.font = '10px -apple-system, sans-serif';
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-    this.items.forEach((it, i) => this._renderItem(ctx, m, it, i === this.sel, paneW));
-    if (this.draft) this._renderDraft(ctx, m, paneW);
+    this.items.forEach((it, i) => this._renderItem(ctx, m, it, i === this.sel, paneW, paneH));
+    if (this.draft) this._renderDraft(ctx, m, paneW, paneH);
     if (this.ruler) this._renderRuler(ctx, m, this.ruler);
     ctx.restore();
   }
 
-  _renderItem(ctx, m, it, selected, paneW) {
+  _stroke(ctx, pts, m) {
+    const P = pts.map(p => [m.X(p.t), m.yOf(p.price)]).filter(p => p[1] != null);
+    if (P.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(P[0][0], P[0][1]);
+    for (let i = 1; i < P.length - 1; i++) {
+      const mx = (P[i][0] + P[i + 1][0]) / 2, my = (P[i][1] + P[i + 1][1]) / 2;
+      ctx.quadraticCurveTo(P[i][0], P[i][1], mx, my);
+    }
+    ctx.lineTo(P[P.length - 1][0], P[P.length - 1][1]);
+    ctx.stroke();
+  }
+
+  _renderItem(ctx, m, it, selected, paneW, paneH) {
     if (it.type === 'hline') {
       const y = m.yOf(it.price);
       if (y == null) return;
@@ -1445,25 +1617,50 @@ class DrawTools {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(paneW, y); ctx.stroke();
       ctx.fillStyle = '#e6edf3';
       ctx.fillText(this._fmt(it.price), paneW - ctx.measureText(this._fmt(it.price)).width - 4, y - 4);
-    } else if (it.type === 'trend') {
+    } else if (it.type === 'vline') {
+      const x = m.X(it.t);
+      ctx.strokeStyle = '#8b949e';
+      ctx.lineWidth = selected ? 2 : 1.2;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, paneH); ctx.stroke();
+      if (selected) this._handles(ctx, [[x, paneH / 2]]);
+    } else if (it.type === 'trend' || it.type === 'ray') {
       const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
-      const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
+      let x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
       if (y1 == null || y2 == null) return;
+      const hx = x2, hy = y2;
+      if (it.type === 'ray') [x2, y2] = this._rayEnd(x1, y1, x2, y2, paneW);
       ctx.strokeStyle = '#58a6ff';
       ctx.lineWidth = selected ? 2.4 : 1.6;
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      if (selected) this._handles(ctx, [[x1, y1], [hx, hy]]);
+    } else if (it.type === 'rect') {
+      const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
+      const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
+      if (y1 == null || y2 == null) return;
+      const lft = Math.min(x1, x2), top = Math.min(y1, y2);
+      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+      ctx.fillStyle = 'rgba(88,166,255,0.10)';
+      ctx.fillRect(lft, top, w, h);
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = selected ? 2 : 1.3;
+      ctx.strokeRect(lft, top, w, h);
       if (selected) this._handles(ctx, [[x1, y1], [x2, y2]]);
+    } else if (it.type === 'text') {
+      const x = m.X(it.at.t), y = m.yOf(it.at.price);
+      if (y == null) return;
+      ctx.font = '12px -apple-system, sans-serif';
+      const w = ctx.measureText(it.text).width;
+      if (selected) {
+        ctx.fillStyle = 'rgba(88,166,255,0.12)';
+        ctx.fillRect(x - 3, y - 14, w + 6, 18);
+      }
+      ctx.fillStyle = '#e6edf3';
+      ctx.fillText(it.text, x, y);
+      ctx.font = '11px -apple-system, sans-serif';
     } else if (it.type === 'brush') {
       ctx.strokeStyle = '#e3b341';
       ctx.lineWidth = selected ? 2.6 : 1.8;
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      it.pts.forEach((p, k) => {
-        const x = m.X(p.t), y = m.yOf(p.price);
-        if (y == null) return;
-        if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
+      this._stroke(ctx, it.pts, m);
     } else if (it.type === 'pos') {
       this._renderPos(ctx, m, it.entry, it.target, it.stop, it.tEnd, selected);
     }
@@ -1474,7 +1671,6 @@ class DrawTools {
     const yE = m.yOf(entry.price), yT = m.yOf(target), yS = m.yOf(stop);
     if (yE == null || yT == null || yS == null) return;
     const wBox = x1 - x0;
-    // зона прибыли и зона риска
     ctx.fillStyle = 'rgba(38,166,154,0.14)';
     ctx.fillRect(x0, Math.min(yE, yT), wBox, Math.abs(yT - yE));
     ctx.fillStyle = 'rgba(239,83,80,0.14)';
@@ -1497,45 +1693,44 @@ class DrawTools {
     if (selected) this._handles(ctx, [[x1, yT], [x1, yS], [x1, yE]]);
   }
 
-  _renderDraft(ctx, m, paneW) {
+  _renderDraft(ctx, m, paneW, paneH) {
     const d = this.draft;
-    ctx.setLineDash([4, 3]);
-    if (d.type === 'trend') {
+    if (d.type === 'trend' || d.type === 'ray') {
+      const x1 = m.X(d.p1.t), y1 = m.yOf(d.p1.price);
+      let x2 = m.X(d.p2.t), y2 = m.yOf(d.p2.price);
+      if (y1 == null || y2 == null) return;
+      if (d.type === 'ray') [x2, y2] = this._rayEnd(x1, y1, x2, y2, paneW);
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (d.type === 'rect') {
       const x1 = m.X(d.p1.t), y1 = m.yOf(d.p1.price);
       const x2 = m.X(d.p2.t), y2 = m.yOf(d.p2.price);
-      if (y1 != null && y2 != null) {
-        ctx.strokeStyle = '#58a6ff';
-        ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-      }
-    } else if (d.type === 'ruler') {
+      if (y1 == null || y2 == null) return;
+      ctx.fillStyle = 'rgba(88,166,255,0.08)';
+      ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 1.3;
+      ctx.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
       ctx.setLineDash([]);
+    } else if (d.type === 'ruler') {
       this._renderRuler(ctx, m, d);
     } else if (d.type === 'brush') {
-      ctx.setLineDash([]);
       ctx.strokeStyle = '#e3b341';
       ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      d.pts.forEach((p, k) => {
-        const x = m.X(p.t), y = m.yOf(p.price);
-        if (y == null) return;
-        if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
+      this._stroke(ctx, d.pts, m);
     } else if (d.type === 'pos') {
-      ctx.setLineDash([]);
       const hoverP = d.hover ? d.hover.price : d.entry.price;
       const target = d.stage === 1 ? hoverP : d.target;
-      const stop = d.stage === 1
-        ? d.entry.price - (target - d.entry.price)
-        : hoverP;
+      const stop = d.stage === 1 ? d.entry.price - (target - d.entry.price) : hoverP;
       const bars = Math.max(20, Math.round((this.cv._paneW() / 12) / 2));
       this._renderPos(ctx, m, d.entry, target, stop, d.entry.t + bars * this._iv(), false);
       ctx.fillStyle = '#8b949e';
-      const hint = d.stage === 1 ? 'клик 2 — тейк' : 'клик 3 — стоп';
-      ctx.fillText(hint, m.X(d.entry.t) + 4, m.yOf(d.entry.price) - 18);
+      ctx.fillText(d.stage === 1 ? 'клик 2 — тейк' : 'клик 3 — стоп', m.X(d.entry.t) + 4, m.yOf(d.entry.price) - 18);
     }
-    ctx.setLineDash([]);
   }
 
   _renderRuler(ctx, m, r) {
