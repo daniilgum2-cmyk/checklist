@@ -872,8 +872,23 @@ class ChartView {
     this.drawings = null;
     this._raf = null;
 
-    this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => this.requestDraw());
+    // СИНХРОННО (не requestDraw): при пане/зуме оверлей должен двигаться в том же
+    // кадре, что и свечи — через rAF разметка «висит в воздухе» и доклеивается позже
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => this.draw());
     new ResizeObserver(() => this.requestDraw()).observe(el);
+    // вертикальный пан шкалы цены и автоскейл НЕ дают событий — следим сами:
+    // каждый кадр сверяем маппинг цена→пиксель и перерисовываем при сдвиге
+    const watch = () => {
+      if (this.candles && this.candles.length) {
+        const ref = this.candles[this.candles.length - 1].c;
+        const y = this.series.priceToCoordinate(ref);
+        const lr = this.chart.timeScale().getVisibleLogicalRange();
+        const sig = y + '|' + (lr ? lr.from.toFixed(2) + ':' + lr.to.toFixed(2) : '');
+        if (sig !== this._sig) { this._sig = sig; this.draw(); }
+      }
+      requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
     this.chart.subscribeCrosshairMove(p => this._updateLegend(p));
   }
 
@@ -1885,14 +1900,14 @@ function buildDrawings(cs, A, { bands = false, maxOB = 3, maxFVG = 4, maxEvents 
     });
   }
 
-  for (const f of A.fvgs.slice(-maxFVG)) {
+  for (const f of (maxFVG > 0 ? A.fvgs.slice(-maxFVG) : [])) {  // slice(-0) вернул бы ВЕСЬ массив — слой не выключался бы
     zones.push({
       i0: f.i, i1: null, top: f.curTop, bottom: f.curBottom,
       fill: 'rgba(171,130,255,0.10)', stroke: 'rgba(171,130,255,0.45)', dash: [3, 3], label: 'FVG',
     });
   }
 
-  for (const ev of A.events.slice(-maxEvents)) {
+  for (const ev of (maxEvents > 0 ? A.events.slice(-maxEvents) : [])) {  // slice(-0) вернул бы ВЕСЬ массив — BOS/ЧоЧ не выключались бы
     const col = ev.type === 'CHOCH' ? '#f0883e' : (ev.dir === 1 ? '#26a69a' : '#ef5350');
     slines.push({ i0: ev.from, i1: ev.at, price: ev.level, color: col, dir: ev.dir, label: ev.type === 'CHOCH' ? 'ЧоЧ' : 'BOS' });
   }
