@@ -402,24 +402,38 @@ footer {
   background: #161b22;
 }
 
-/* ---------- инструменты рисования ---------- */
+/* ---------- инструменты рисования (стиль TradingView) ---------- */
 .draw-toolbar {
-  position: absolute; left: 6px; top: 34px; z-index: 6;
-  display: flex; flex-direction: column; gap: 2px;
-  background: rgba(22,27,34,0.88); border: 1px solid #30363d;
-  border-radius: 8px; padding: 4px; backdrop-filter: blur(4px);
+  position: absolute; left: 8px; top: 38px; z-index: 6;
+  display: flex; flex-direction: column; gap: 1px;
+  background: rgba(22,27,34,0.92); border: 1px solid #30363d;
+  border-radius: 6px; padding: 3px; backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
 }
 .draw-toolbar button {
-  width: 30px; height: 30px; border: none; border-radius: 6px;
-  background: transparent; color: #8b949e; font-size: 14px;
-  cursor: pointer; line-height: 1; padding: 0;
+  width: 30px; height: 30px; border: none; border-radius: 4px;
+  background: transparent; color: #b9c1cb;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0;
 }
-.draw-toolbar button:hover { background: #21262d; color: #e6edf3; }
-.draw-toolbar button.active { background: rgba(31,111,235,0.25); color: #58a6ff; }
-.draw-toolbar .sep { height: 1px; background: #30363d; margin: 3px 2px; }
+.draw-toolbar button svg { width: 18px; height: 18px; display: block; }
+.draw-toolbar button:hover { background: #262c36; color: #e6edf3; }
+.draw-toolbar button.active { background: rgba(47,129,247,0.22); color: #58a6ff; }
+.draw-toolbar .sep { height: 1px; background: #30363d; margin: 3px 4px; }
 @media (pointer: coarse) {
-  .draw-toolbar button { width: 38px; height: 38px; font-size: 17px; }
+  .draw-toolbar button { width: 38px; height: 38px; }
+  .draw-toolbar button svg { width: 21px; height: 21px; }
 }
+
+/* всплывающая подсказка о действии */
+.draw-toast {
+  position: absolute; left: 50%; bottom: 42px; transform: translateX(-50%) translateY(6px);
+  z-index: 8; pointer-events: none;
+  background: rgba(22,27,34,0.95); border: 1px solid #30363d; border-radius: 5px;
+  color: #e6edf3; font: 11px -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: 5px 10px; opacity: 0; transition: opacity .15s ease, transform .15s ease;
+}
+.draw-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* поле ввода для текста-заметки */
 .draw-text-input {
@@ -1083,6 +1097,23 @@ class ChartView {
    поэтому переживают обновление свечей и видны на всех таймфреймах. */
 const DRAW_STORE = 'smc_drawings_v1';
 
+/* SVG-иконки панели (18×18, currentColor) — стиль TradingView */
+const DRAW_ICONS = {
+  cursor: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="2.2"/><path d="M9 1.5v3.2M9 13.3v3.2M1.5 9h3.2M13.3 9h3.2"/></svg>',
+  trend: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5 13 13 5"/><circle cx="3.8" cy="14.2" r="1.7"/><circle cx="14.2" cy="3.8" r="1.7"/></svg>',
+  ray: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="4.5" cy="13.5" r="1.7"/><path d="M5.8 12.2 15.5 2.5M15.5 6.5v-4h-4"/></svg>',
+  hline: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M1.8 9h5M11.2 9h5"/><circle cx="9" cy="9" r="1.7"/></svg>',
+  vline: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M9 1.8v5M9 11.2v5"/><circle cx="9" cy="9" r="1.7"/></svg>',
+  rect: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="4.5" width="12" height="9" rx="1"/></svg>',
+  ruler: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 15 15 3"/><path d="M6.2 11.8l1.6 1.6M9 9l1.6 1.6M11.8 6.2l1.6 1.6"/></svg>',
+  brush: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 12.5c2.5-6 4.5 3 7-2s3.5-5.5 6-4.5"/></svg>',
+  text: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 4.5h10M9 4.5V14"/></svg>',
+  pos: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3.5" width="12" height="5" rx="0.8" stroke="#26a69a"/><rect x="3" y="10" width="12" height="4" rx="0.8" stroke="#ef5350"/></svg>',
+  magnet: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 3v5.5a3.5 3.5 0 0 0 7 0V3"/><path d="M3.8 3h3.4M10.8 3h3.4"/></svg>',
+  trash: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3.5 5.5h11M7 3.5h4M5 5.5l.8 9h6.4l.8-9M7.5 8v4M10.5 8v4"/></svg>',
+  clear: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg>',
+};
+
 class DrawTools {
   constructor(cv) {
     this.cv = cv;
@@ -1108,75 +1139,144 @@ class DrawTools {
     cv.el.addEventListener('pointerdown', e => this._down(e), true);
     window.addEventListener('pointermove', e => this._move(e));
     window.addEventListener('pointerup', e => this._up(e));
-    window.addEventListener('keydown', e => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && this.sel >= 0
-          && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
-        e.preventDefault();
-        this._deleteSelected();
-      }
-    });
+    window.addEventListener('keydown', e => this._hotkey(e));
+  }
+
+  /* ---------- горячие клавиши (раскладка TradingView) ---------- */
+  _hotkey(e) {
+    // не мешаем вводу текста и полям страницы
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    // работаем только с видимым графиком (у каждой вкладки свой DrawTools)
+    if (!this.cv.el.offsetParent) return;
+
+    const code = e.code;  // раскладка-независимо: KeyT работает и на русской
+    const mod = e.metaKey || e.ctrlKey;
+
+    if (mod && code === 'KeyZ') { e.preventDefault(); this.undo(); return; }
+
+    if (e.altKey && !mod) {
+      const map = {
+        KeyT: 'trend', KeyJ: 'ray', KeyH: 'hline', KeyV: 'vline',
+        KeyR: 'rect', KeyB: 'brush', KeyN: 'text', KeyM: 'ruler', KeyP: 'pos',
+      };
+      if (map[code]) { e.preventDefault(); this.setTool(map[code]); this._toast(this.btns[map[code]].title.split(' · ')[0]); return; }
+      if (code === 'KeyS') { e.preventDefault(); this.toggleMagnet(); return; }
+      if (code === 'Backspace' || code === 'Delete') { e.preventDefault(); this.clearAll(); return; }
+      return;
+    }
+
+    if (code === 'Escape') {
+      e.preventDefault();
+      if (this.draft) { this.draft = null; this.cv.requestDraw(); }
+      else if (this.tool !== 'cursor') this.setTool('cursor');
+      else if (this.sel >= 0) { this.sel = -1; this.cv.requestDraw(); }
+      return;
+    }
+    if ((code === 'Delete' || code === 'Backspace') && this.sel >= 0) {
+      e.preventDefault();
+      this._deleteSelected();
+    }
   }
 
   /* ---------- панель ---------- */
   _buildToolbar() {
     const bar = document.createElement('div');
     bar.className = 'draw-toolbar';
-    const tools = [
-      ['cursor', '⌖', 'Курсор — выбрать, подвинуть, отредактировать'],
-      ['trend', '╱', 'Линия тренда (протянуть)'],
-      ['ray', '⟶', 'Луч — линия от точки в бесконечность (протянуть)'],
-      ['hline', '─', 'Горизонтальный уровень (клик по цене)'],
-      ['vline', '│', 'Вертикальная линия (клик по времени)'],
-      ['rect', '▭', 'Прямоугольник / зона (протянуть)'],
-      ['ruler', '⤢', 'Линейка: измерить ход в % и барах (протянуть)'],
-      ['brush', '✎', 'Кисть (рисовать от руки)'],
-      ['text', 'T', 'Текст / заметка (клик, затем ввод)'],
-      ['pos', 'RR', 'Лонг/шорт позиция: 3 клика — вход, тейк, стоп'],
+    // группы разделены линией — как в TradingView: курсор | линии | фигуры | измерения | позиция
+    const groups = [
+      [['cursor', 'Курсор — выбрать, подвинуть', 'Esc']],
+      [['trend', 'Линия тренда', 'Alt+T'],
+       ['ray', 'Луч (от точки в бесконечность)', 'Alt+J'],
+       ['hline', 'Горизонтальный уровень', 'Alt+H'],
+       ['vline', 'Вертикальная линия', 'Alt+V']],
+      [['rect', 'Прямоугольник / зона', 'Alt+R'],
+       ['brush', 'Кисть', 'Alt+B'],
+       ['text', 'Текст / заметка', 'Alt+N']],
+      [['ruler', 'Линейка (или Shift+протянуть)', 'Alt+M'],
+       ['pos', 'Лонг/шорт позиция', 'Alt+P']],
     ];
     this.btns = {};
-    for (const [id, glyph, title] of tools) {
-      const b = document.createElement('button');
-      b.textContent = glyph;
-      b.title = title;
-      b.addEventListener('click', () => this.setTool(id));
-      bar.appendChild(b);
-      this.btns[id] = b;
-    }
-    // магнит — переключатель, не инструмент
-    const sep0 = document.createElement('div');
-    sep0.className = 'sep';
-    bar.appendChild(sep0);
-    this.magnetBtn = document.createElement('button');
-    this.magnetBtn.textContent = '🧲';
-    this.magnetBtn.title = 'Магнит: привязка точек к свечам (хай/лой/откр/закр)';
-    this.magnetBtn.classList.toggle('active', this.magnet);
-    this.magnetBtn.addEventListener('click', () => {
-      this.magnet = !this.magnet;
-      this.magnetBtn.classList.toggle('active', this.magnet);
+    groups.forEach((group, gi) => {
+      if (gi) bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
+      for (const [id, label, key] of group) {
+        const b = document.createElement('button');
+        b.innerHTML = DRAW_ICONS[id];
+        b.title = `${label} · ${key}`;
+        b.addEventListener('click', () => this.setTool(id));
+        bar.appendChild(b);
+        this.btns[id] = b;
+      }
     });
+
+    bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
+    this.magnetBtn = document.createElement('button');
+    this.magnetBtn.innerHTML = DRAW_ICONS.magnet;
+    this.magnetBtn.title = 'Магнит: привязка к свечам · Alt+S';
+    this.magnetBtn.classList.toggle('active', this.magnet);
+    this.magnetBtn.addEventListener('click', () => this.toggleMagnet());
     bar.appendChild(this.magnetBtn);
 
-    const sep = document.createElement('div');
-    sep.className = 'sep';
-    bar.appendChild(sep);
+    bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
     const del = document.createElement('button');
-    del.textContent = '🗑';
-    del.title = 'Удалить выбранный рисунок (или клавиша Delete)';
+    del.innerHTML = DRAW_ICONS.trash;
+    del.title = 'Удалить выбранный рисунок · Delete';
     del.addEventListener('click', () => this._deleteSelected());
     bar.appendChild(del);
     const clear = document.createElement('button');
-    clear.textContent = '✕';
-    clear.title = 'Стереть все рисунки на этой монете';
-    clear.addEventListener('click', () => {
-      this.items = [];
-      this.sel = -1;
-      this.ruler = null;
-      this._save();
-      this.cv.requestDraw();
-    });
+    clear.innerHTML = DRAW_ICONS.clear;
+    clear.title = 'Стереть все рисунки на монете · Alt+Backspace';
+    clear.addEventListener('click', () => this.clearAll());
     bar.appendChild(clear);
+
     this.cv.el.appendChild(bar);
     this.setTool('cursor');
+  }
+
+  toggleMagnet() {
+    this.magnet = !this.magnet;
+    this.magnetBtn.classList.toggle('active', this.magnet);
+    this._toast(this.magnet ? 'Магнит включён' : 'Магнит выключен');
+  }
+
+  clearAll() {
+    if (!this.items.length) return;
+    this._pushHistory();
+    this.items = [];
+    this.sel = -1;
+    this.ruler = null;
+    this._save();
+    this.cv.requestDraw();
+    this._toast('Рисунки удалены · Cmd+Z вернёт');
+  }
+
+  // короткая подсказка в углу графика (как всплывашки TradingView)
+  _toast(text) {
+    clearTimeout(this._toastT);
+    if (!this._toastEl) {
+      this._toastEl = document.createElement('div');
+      this._toastEl.className = 'draw-toast';
+      this.cv.el.appendChild(this._toastEl);
+    }
+    this._toastEl.textContent = text;
+    this._toastEl.classList.add('show');
+    this._toastT = setTimeout(() => this._toastEl.classList.remove('show'), 1400);
+  }
+
+  /* ---------- история для отмены (Cmd+Z) ---------- */
+  _pushHistory() {
+    this._history = this._history || [];
+    this._history.push(JSON.stringify(this.items));
+    if (this._history.length > 50) this._history.shift();
+  }
+
+  undo() {
+    if (!this._history || !this._history.length) { this._toast('Отменять нечего'); return; }
+    this.items = JSON.parse(this._history.pop());
+    this.sel = -1;
+    this.draft = null;
+    this._save();
+    this.cv.requestDraw();
+    this._toast('Отменено');
   }
 
   setTool(id) {
@@ -1216,6 +1316,7 @@ class DrawTools {
 
   _deleteSelected() {
     if (this.sel < 0) return;
+    this._pushHistory();
     this.items.splice(this.sel, 1);
     this.sel = -1;
     this._save();
@@ -1282,6 +1383,7 @@ class DrawTools {
       const v = inp.value.trim();
       inp.remove();
       if (save) {
+        this._pushHistory();
         if (existing) {
           if (v) existing.text = v; else this.items.splice(this.items.indexOf(existing), 1);
         } else if (v) {
@@ -1311,6 +1413,15 @@ class DrawTools {
     const pt = this._pt(x, y);
     if (!pt) return;
 
+    // Shift + протянуть при курсоре — быстрая линейка, как в TradingView
+    if (this.tool === 'cursor' && e.shiftKey) {
+      this.draft = { type: 'ruler', p1: pt, p2: pt };
+      e.preventDefault();
+      e.stopPropagation();
+      this.cv.requestDraw();
+      return;
+    }
+
     if (this.tool === 'cursor') {
       const hit = this._hitTest(x, y);
       if (hit) {
@@ -1322,6 +1433,7 @@ class DrawTools {
           return;
         }
         this.sel = hit.i;
+        this._pushHistory();  // перемещение тоже отменяется по Cmd+Z
         this.drag = { i: hit.i, handle: hit.handle, x0: x, y0: y,
                       orig: JSON.parse(JSON.stringify(this.items[hit.i])) };
         e.preventDefault();
@@ -1337,11 +1449,13 @@ class DrawTools {
     e.stopPropagation();
 
     if (this.tool === 'hline') {
+      this._pushHistory();
       this.items.push({ type: 'hline', price: pt.price });
       this.sel = this.items.length - 1;
       this._save();
       this.setTool('cursor');
     } else if (this.tool === 'vline') {
+      this._pushHistory();
       this.items.push({ type: 'vline', t: pt.t });
       this.sel = this.items.length - 1;
       this._save();
@@ -1368,6 +1482,7 @@ class DrawTools {
       } else {
         const d = this.draft;
         const bars = Math.max(20, Math.round((this.cv._paneW() / 12) / 2));
+        this._pushHistory();
         this.items.push({ type: 'pos', entry: d.entry, target: d.target,
                           stop: pt.price, tEnd: d.entry.t + bars * this._iv() });
         this.sel = this.items.length - 1;
@@ -1425,6 +1540,7 @@ class DrawTools {
     if (!d) return;
     if (d.type === 'trend' || d.type === 'ray') {
       if (Math.abs(d.p2.t - d.p1.t) > 0 || Math.abs(d.p2.price - d.p1.price) > 0) {
+        this._pushHistory();
         this.items.push({ type: d.type, p1: d.p1, p2: d.p2 });
         this.sel = this.items.length - 1;
         this._save();
@@ -1433,6 +1549,7 @@ class DrawTools {
       this.setTool('cursor');
     } else if (d.type === 'rect') {
       if (Math.abs(d.p2.t - d.p1.t) > 0 && Math.abs(d.p2.price - d.p1.price) > 0) {
+        this._pushHistory();
         this.items.push({ type: 'rect', p1: d.p1, p2: d.p2 });
         this.sel = this.items.length - 1;
         this._save();
@@ -1441,6 +1558,7 @@ class DrawTools {
       this.setTool('cursor');
     } else if (d.type === 'brush') {
       if (d.pts.length > 2) {
+        this._pushHistory();
         this.items.push({ type: 'brush', pts: d.pts });
         this.sel = this.items.length - 1;
         this._save();
