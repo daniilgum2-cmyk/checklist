@@ -435,15 +435,6 @@ footer {
 }
 .draw-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* поле ввода для текста-заметки */
-.draw-text-input {
-  position: absolute; z-index: 7;
-  background: rgba(13,17,23,0.95); color: #e6edf3;
-  border: 1px solid #58a6ff; border-radius: 4px;
-  font: 12px -apple-system, "Segoe UI", Roboto, sans-serif;
-  padding: 2px 6px; outline: none; min-width: 120px;
-}
-
 </style>
 </head>
 <body>
@@ -1089,26 +1080,22 @@ class ChartView {
 
 </script>
 <script>
-/* Инструменты рисования поверх графика (стиль TradingView/digash):
-   курсор, магнит (привязка к свечам), линия тренда, луч, горизонтальный
-   уровень, вертикаль, прямоугольник/зона, линейка, кисть (гладкая),
-   текст-заметка, лонг/шорт позиция.
-   Рисунки хранятся в localStorage по символу (координаты время+цена),
+/* Инструменты рисования поверх графика (минимальный набор под скальпинг пробоев):
+   курсор, линия тренда, горизонтальный луч (уровень от точки вправо),
+   линейка (Δ% и бары, эфемерная), стрелка-траектория.
+   Горячие клавиши как в TradingView, магнит к свечам, отмена Cmd+Z.
+   Рисунки хранятся в localStorage по символу в координатах время+цена,
    поэтому переживают обновление свечей и видны на всех таймфреймах. */
 const DRAW_STORE = 'smc_drawings_v1';
+const DRAW_TYPES = ['trend', 'hray', 'arrow'];  // всё остальное из старых версий игнорируем
 
-/* SVG-иконки панели (18×18, currentColor) — стиль TradingView */
+/* SVG-иконки панели (18×18, currentColor) */
 const DRAW_ICONS = {
   cursor: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="2.2"/><path d="M9 1.5v3.2M9 13.3v3.2M1.5 9h3.2M13.3 9h3.2"/></svg>',
   trend: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5 13 13 5"/><circle cx="3.8" cy="14.2" r="1.7"/><circle cx="14.2" cy="3.8" r="1.7"/></svg>',
-  ray: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="4.5" cy="13.5" r="1.7"/><path d="M5.8 12.2 15.5 2.5M15.5 6.5v-4h-4"/></svg>',
-  hline: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M1.8 9h5M11.2 9h5"/><circle cx="9" cy="9" r="1.7"/></svg>',
-  vline: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M9 1.8v5M9 11.2v5"/><circle cx="9" cy="9" r="1.7"/></svg>',
-  rect: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="4.5" width="12" height="9" rx="1"/></svg>',
+  hray: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="3.6" cy="9" r="1.7"/><path d="M5.6 9h10.8"/></svg>',
   ruler: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 15 15 3"/><path d="M6.2 11.8l1.6 1.6M9 9l1.6 1.6M11.8 6.2l1.6 1.6"/></svg>',
-  brush: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 12.5c2.5-6 4.5 3 7-2s3.5-5.5 6-4.5"/></svg>',
-  text: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 4.5h10M9 4.5V14"/></svg>',
-  pos: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3.5" width="12" height="5" rx="0.8" stroke="#26a69a"/><rect x="3" y="10" width="12" height="4" rx="0.8" stroke="#ef5350"/></svg>',
+  arrow: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15 14.2 3.8"/><path d="M9.4 3.5h5v5"/></svg>',
   magnet: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 3v5.5a3.5 3.5 0 0 0 7 0V3"/><path d="M3.8 3h3.4M10.8 3h3.4"/></svg>',
   trash: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3.5 5.5h11M7 3.5h4M5 5.5l.8 9h6.4l.8-9M7.5 8v4M10.5 8v4"/></svg>',
   clear: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg>',
@@ -1125,6 +1112,7 @@ class DrawTools {
     this.ruler = null;   // линейка (эфемерная, не сохраняется)
     this.sel = -1;
     this.drag = null;
+    this._history = [];
 
     this.canvas = document.createElement('canvas');
     Object.assign(this.canvas.style, { position: 'absolute', left: 0, top: 0, pointerEvents: 'none', zIndex: 4 });
@@ -1142,58 +1130,16 @@ class DrawTools {
     window.addEventListener('keydown', e => this._hotkey(e));
   }
 
-  /* ---------- горячие клавиши (раскладка TradingView) ---------- */
-  _hotkey(e) {
-    // не мешаем вводу текста и полям страницы
-    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-    // работаем только с видимым графиком (у каждой вкладки свой DrawTools)
-    if (!this.cv.el.offsetParent) return;
-
-    const code = e.code;  // раскладка-независимо: KeyT работает и на русской
-    const mod = e.metaKey || e.ctrlKey;
-
-    if (mod && code === 'KeyZ') { e.preventDefault(); this.undo(); return; }
-
-    if (e.altKey && !mod) {
-      const map = {
-        KeyT: 'trend', KeyJ: 'ray', KeyH: 'hline', KeyV: 'vline',
-        KeyR: 'rect', KeyB: 'brush', KeyN: 'text', KeyM: 'ruler', KeyP: 'pos',
-      };
-      if (map[code]) { e.preventDefault(); this.setTool(map[code]); this._toast(this.btns[map[code]].title.split(' · ')[0]); return; }
-      if (code === 'KeyS') { e.preventDefault(); this.toggleMagnet(); return; }
-      if (code === 'Backspace' || code === 'Delete') { e.preventDefault(); this.clearAll(); return; }
-      return;
-    }
-
-    if (code === 'Escape') {
-      e.preventDefault();
-      if (this.draft) { this.draft = null; this.cv.requestDraw(); }
-      else if (this.tool !== 'cursor') this.setTool('cursor');
-      else if (this.sel >= 0) { this.sel = -1; this.cv.requestDraw(); }
-      return;
-    }
-    if ((code === 'Delete' || code === 'Backspace') && this.sel >= 0) {
-      e.preventDefault();
-      this._deleteSelected();
-    }
-  }
-
   /* ---------- панель ---------- */
   _buildToolbar() {
     const bar = document.createElement('div');
     bar.className = 'draw-toolbar';
-    // группы разделены линией — как в TradingView: курсор | линии | фигуры | измерения | позиция
     const groups = [
       [['cursor', 'Курсор — выбрать, подвинуть', 'Esc']],
       [['trend', 'Линия тренда', 'Alt+T'],
-       ['ray', 'Луч (от точки в бесконечность)', 'Alt+J'],
-       ['hline', 'Горизонтальный уровень', 'Alt+H'],
-       ['vline', 'Вертикальная линия', 'Alt+V']],
-      [['rect', 'Прямоугольник / зона', 'Alt+R'],
-       ['brush', 'Кисть', 'Alt+B'],
-       ['text', 'Текст / заметка', 'Alt+N']],
-      [['ruler', 'Линейка (или Shift+протянуть)', 'Alt+M'],
-       ['pos', 'Лонг/шорт позиция', 'Alt+P']],
+       ['hray', 'Горизонтальный луч (уровень вправо)', 'Alt+H'],
+       ['arrow', 'Стрелка — траектория', 'Alt+A']],
+      [['ruler', 'Линейка (или Shift+протянуть)', 'Alt+M']],
     ];
     this.btns = {};
     groups.forEach((group, gi) => {
@@ -1232,6 +1178,15 @@ class DrawTools {
     this.setTool('cursor');
   }
 
+  setTool(id) {
+    this.tool = id;
+    this.draft = null;
+    for (const [k, b] of Object.entries(this.btns)) b.classList.toggle('active', k === id);
+    // пока активен инструмент — жесты не двигают график (важно для тача)
+    this.cv.el.style.touchAction = id === 'cursor' ? '' : 'none';
+    this.cv.requestDraw();
+  }
+
   toggleMagnet() {
     this.magnet = !this.magnet;
     this.magnetBtn.classList.toggle('active', this.magnet);
@@ -1249,7 +1204,7 @@ class DrawTools {
     this._toast('Рисунки удалены · Cmd+Z вернёт');
   }
 
-  // короткая подсказка в углу графика (как всплывашки TradingView)
+  // короткая подсказка в углу графика
   _toast(text) {
     clearTimeout(this._toastT);
     if (!this._toastEl) {
@@ -1262,15 +1217,14 @@ class DrawTools {
     this._toastT = setTimeout(() => this._toastEl.classList.remove('show'), 1400);
   }
 
-  /* ---------- история для отмены (Cmd+Z) ---------- */
+  /* ---------- история (Cmd+Z) ---------- */
   _pushHistory() {
-    this._history = this._history || [];
     this._history.push(JSON.stringify(this.items));
     if (this._history.length > 50) this._history.shift();
   }
 
   undo() {
-    if (!this._history || !this._history.length) { this._toast('Отменять нечего'); return; }
+    if (!this._history.length) { this._toast('Отменять нечего'); return; }
     this.items = JSON.parse(this._history.pop());
     this.sel = -1;
     this.draft = null;
@@ -1279,13 +1233,40 @@ class DrawTools {
     this._toast('Отменено');
   }
 
-  setTool(id) {
-    this.tool = id;
-    this.draft = null;
-    for (const [k, b] of Object.entries(this.btns)) b.classList.toggle('active', k === id);
-    // пока активен инструмент — жесты не двигают график (важно для тача)
-    this.cv.el.style.touchAction = id === 'cursor' ? '' : 'none';
-    this.cv.requestDraw();
+  /* ---------- горячие клавиши (раскладка TradingView) ---------- */
+  _hotkey(e) {
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    if (!this.cv.el.offsetParent) return;  // только видимая вкладка
+
+    const code = e.code;  // раскладка-независимо: KeyT работает и на русской
+    const mod = e.metaKey || e.ctrlKey;
+
+    if (mod && code === 'KeyZ') { e.preventDefault(); this.undo(); return; }
+
+    if (e.altKey && !mod) {
+      const map = { KeyT: 'trend', KeyH: 'hray', KeyA: 'arrow', KeyM: 'ruler' };
+      if (map[code]) {
+        e.preventDefault();
+        this.setTool(map[code]);
+        this._toast(this.btns[map[code]].title.split(' · ')[0]);
+        return;
+      }
+      if (code === 'KeyS') { e.preventDefault(); this.toggleMagnet(); return; }
+      if (code === 'Backspace' || code === 'Delete') { e.preventDefault(); this.clearAll(); return; }
+      return;
+    }
+
+    if (code === 'Escape') {
+      e.preventDefault();
+      if (this.draft) { this.draft = null; this.cv.requestDraw(); }
+      else if (this.tool !== 'cursor') this.setTool('cursor');
+      else if (this.sel >= 0) { this.sel = -1; this.cv.requestDraw(); }
+      return;
+    }
+    if ((code === 'Delete' || code === 'Backspace') && this.sel >= 0) {
+      e.preventDefault();
+      this._deleteSelected();
+    }
   }
 
   setSymbol(sym) {
@@ -1295,13 +1276,16 @@ class DrawTools {
     this.sel = -1;
     this.draft = null;
     this.ruler = null;
+    this._history = [];
     this.cv.requestDraw();
   }
 
   /* ---------- хранение ---------- */
   _load(sym) {
-    try { return (JSON.parse(localStorage.getItem(DRAW_STORE) || '{}')[sym]) || []; }
-    catch (e) { return []; }
+    try {
+      const arr = (JSON.parse(localStorage.getItem(DRAW_STORE) || '{}')[sym]) || [];
+      return arr.filter(i => DRAW_TYPES.includes(i.type));  // чистим рисунки убранных инструментов
+    } catch (e) { return []; }
   }
 
   _save() {
@@ -1337,7 +1321,7 @@ class DrawTools {
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
-  // привязка точки к ближайшей свече: время → центр свечи, цена → ближайший из OHLC
+  // привязка к ближайшей свече: время → центр свечи, цена → ближайший из OHLC
   _snap(pt) {
     const cs = this.cv.candles;
     if (!this.magnet || !cs || !cs.length) return pt;
@@ -1366,55 +1350,18 @@ class DrawTools {
 
   _fmt(v) { return v.toFixed(this.cv.precision || 2); }
 
-  /* ---------- текст-редактор ---------- */
-  _startTextInput(pt, x, y, existing) {
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.className = 'draw-text-input';
-    inp.value = existing ? existing.text : '';
-    Object.assign(inp.style, { left: x + 'px', top: y + 'px' });
-    this.cv.el.appendChild(inp);
-    setTimeout(() => { inp.focus(); inp.select(); }, 0);
-    let done = false;
-    // finish вызывается напрямую (Enter/Escape) и по blur — не завязан только на blur
-    const finish = (save) => {
-      if (done) return;
-      done = true;
-      const v = inp.value.trim();
-      inp.remove();
-      if (save) {
-        this._pushHistory();
-        if (existing) {
-          if (v) existing.text = v; else this.items.splice(this.items.indexOf(existing), 1);
-        } else if (v) {
-          this.items.push({ type: 'text', at: pt, text: v });
-          this.sel = this.items.length - 1;
-        }
-      }
-      this._save();
-      this.setTool('cursor');
-      this.cv.requestDraw();
-    };
-    inp.addEventListener('blur', () => finish(true));
-    inp.addEventListener('keydown', e => {
-      e.stopPropagation();
-      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
-    });
-  }
-
   /* ---------- события ---------- */
   _down(e) {
     if (e.button > 0 || !this.cv.candles) return;
     const { x, y } = this._xy(e);
     if (!this._inPane(x, y)) return;
     if (e.target.closest('.draw-toolbar') || e.target.closest('.chart-reset')) return;
-    this.ruler = null;
     const pt = this._pt(x, y);
     if (!pt) return;
 
-    // Shift + протянуть при курсоре — быстрая линейка, как в TradingView
+    // Shift+протянуть при курсоре — быстрая линейка (как в TradingView)
     if (this.tool === 'cursor' && e.shiftKey) {
+      this.ruler = null;
       this.draft = { type: 'ruler', p1: pt, p2: pt };
       e.preventDefault();
       e.stopPropagation();
@@ -1422,16 +1369,11 @@ class DrawTools {
       return;
     }
 
+    this.ruler = null;
+
     if (this.tool === 'cursor') {
       const hit = this._hitTest(x, y);
       if (hit) {
-        // двойной клик по тексту — редактировать
-        if (this.items[hit.i].type === 'text' && e.detail >= 2) {
-          const m = this._screen({});
-          this._startTextInput(null, m.X(this.items[hit.i].at.t), m.yOf(this.items[hit.i].at.price) - 10, this.items[hit.i]);
-          e.preventDefault(); e.stopPropagation();
-          return;
-        }
         this.sel = hit.i;
         this._pushHistory();  // перемещение тоже отменяется по Cmd+Z
         this.drag = { i: hit.i, handle: hit.handle, x0: x, y0: y,
@@ -1448,48 +1390,14 @@ class DrawTools {
     e.preventDefault();
     e.stopPropagation();
 
-    if (this.tool === 'hline') {
+    if (this.tool === 'hray') {
       this._pushHistory();
-      this.items.push({ type: 'hline', price: pt.price });
+      this.items.push({ type: 'hray', t: pt.t, price: pt.price });
       this.sel = this.items.length - 1;
       this._save();
       this.setTool('cursor');
-    } else if (this.tool === 'vline') {
-      this._pushHistory();
-      this.items.push({ type: 'vline', t: pt.t });
-      this.sel = this.items.length - 1;
-      this._save();
-      this.setTool('cursor');
-    } else if (this.tool === 'trend') {
-      this.draft = { type: 'trend', p1: pt, p2: pt };
-    } else if (this.tool === 'ray') {
-      this.draft = { type: 'ray', p1: pt, p2: pt };
-    } else if (this.tool === 'rect') {
-      this.draft = { type: 'rect', p1: pt, p2: pt };
-    } else if (this.tool === 'ruler') {
-      this.draft = { type: 'ruler', p1: pt, p2: pt };
-    } else if (this.tool === 'brush') {
-      this.draft = { type: 'brush', pts: [this._pt(x, y, false)] };
-    } else if (this.tool === 'text') {
-      this._startTextInput(pt, x, y - 10, null);
-    } else if (this.tool === 'pos') {
-      if (!this.draft) {
-        this.draft = { type: 'pos', stage: 1, entry: pt, hover: pt };
-      } else if (this.draft.stage === 1) {
-        this.draft.target = pt.price;
-        this.draft.stage = 2;
-        this.draft.hover = pt;
-      } else {
-        const d = this.draft;
-        const bars = Math.max(20, Math.round((this.cv._paneW() / 12) / 2));
-        this._pushHistory();
-        this.items.push({ type: 'pos', entry: d.entry, target: d.target,
-                          stop: pt.price, tEnd: d.entry.t + bars * this._iv() });
-        this.sel = this.items.length - 1;
-        this.draft = null;
-        this._save();
-        this.setTool('cursor');
-      }
+    } else if (this.tool === 'trend' || this.tool === 'arrow' || this.tool === 'ruler') {
+      this.draft = { type: this.tool, p1: pt, p2: pt };
     }
     this.cv.requestDraw();
   }
@@ -1514,20 +1422,10 @@ class DrawTools {
       this.cv.requestDraw();
       return;
     }
-    if (!this.draft) return;
-    const d = this.draft;
-    if (d.type === 'trend' || d.type === 'ray' || d.type === 'rect' || d.type === 'ruler') {
-      d.p2 = pt;
-    } else if (d.type === 'brush') {
-      const raw = this._pt(cx, cy, false);
-      const last = d.pts[d.pts.length - 1];
-      const m = this._screen({});
-      const lx = m.X(last.t), ly = m.yOf(last.price);
-      if (lx == null || ly == null || Math.hypot(cx - lx, cy - ly) >= 2) d.pts.push(raw);
-    } else if (d.type === 'pos') {
-      d.hover = pt;
+    if (this.draft) {
+      this.draft.p2 = pt;
+      this.cv.requestDraw();
     }
-    this.cv.requestDraw();
   }
 
   _up() {
@@ -1538,76 +1436,36 @@ class DrawTools {
     }
     const d = this.draft;
     if (!d) return;
-    if (d.type === 'trend' || d.type === 'ray') {
-      if (Math.abs(d.p2.t - d.p1.t) > 0 || Math.abs(d.p2.price - d.p1.price) > 0) {
-        this._pushHistory();
-        this.items.push({ type: d.type, p1: d.p1, p2: d.p2 });
-        this.sel = this.items.length - 1;
-        this._save();
-      }
+    const moved = Math.abs(d.p2.t - d.p1.t) > 0 || Math.abs(d.p2.price - d.p1.price) > 0;
+    if (d.type === 'ruler') {
+      if (moved) this.ruler = { p1: d.p1, p2: d.p2 };
       this.draft = null;
       this.setTool('cursor');
-    } else if (d.type === 'rect') {
-      if (Math.abs(d.p2.t - d.p1.t) > 0 && Math.abs(d.p2.price - d.p1.price) > 0) {
-        this._pushHistory();
-        this.items.push({ type: 'rect', p1: d.p1, p2: d.p2 });
-        this.sel = this.items.length - 1;
-        this._save();
-      }
+    } else if (moved) {
+      this._pushHistory();
+      this.items.push({ type: d.type, p1: d.p1, p2: d.p2 });
+      this.sel = this.items.length - 1;
+      this._save();
       this.draft = null;
       this.setTool('cursor');
-    } else if (d.type === 'brush') {
-      if (d.pts.length > 2) {
-        this._pushHistory();
-        this.items.push({ type: 'brush', pts: d.pts });
-        this.sel = this.items.length - 1;
-        this._save();
-      }
+    } else {
       this.draft = null;
-      this.setTool('cursor');
-    } else if (d.type === 'ruler') {
-      this.ruler = { p1: d.p1, p2: d.p2 };
-      this.draft = null;
-      this.setTool('cursor');
     }
-    // pos создаётся кликами — по отпусканию ничего не делаем
     this.cv.requestDraw();
   }
 
   _applyDrag(it, o, handle, dt, dp, pt) {
-    if (it.type === 'hline') { it.price = o.price + dp; return; }
-    if (it.type === 'vline') { it.t = pt.t; return; }
-    if (it.type === 'trend' || it.type === 'ray') {
-      if (handle === 'p1') { it.p1 = { t: pt.t, price: pt.price }; }
-      else if (handle === 'p2') { it.p2 = { t: pt.t, price: pt.price }; }
-      else {
-        it.p1 = { t: o.p1.t + dt, price: o.p1.price + dp };
-        it.p2 = { t: o.p2.t + dt, price: o.p2.price + dp };
-      }
+    if (it.type === 'hray') {
+      if (handle === 'p1') { it.t = pt.t; it.price = pt.price; }
+      else { it.t = o.t + dt; it.price = o.price + dp; }
       return;
     }
-    if (it.type === 'rect') {
-      if (handle === 'p1') { it.p1 = { t: pt.t, price: pt.price }; }
-      else if (handle === 'p2') { it.p2 = { t: pt.t, price: pt.price }; }
-      else {
-        it.p1 = { t: o.p1.t + dt, price: o.p1.price + dp };
-        it.p2 = { t: o.p2.t + dt, price: o.p2.price + dp };
-      }
-      return;
-    }
-    if (it.type === 'text') { it.at = { t: pt.t, price: pt.price }; return; }
-    if (it.type === 'brush') {
-      it.pts = o.pts.map(p => ({ t: p.t + dt, price: p.price + dp }));
-      return;
-    }
-    if (it.type === 'pos') {
-      if (handle === 'target') { it.target = pt.price; return; }
-      if (handle === 'stop') { it.stop = pt.price; return; }
-      if (handle === 'end') { it.tEnd = Math.max(o.entry.t + this._iv() * 3, o.tEnd + dt); return; }
-      it.entry = { t: o.entry.t + dt, price: o.entry.price + dp };
-      it.target = o.target + dp;
-      it.stop = o.stop + dp;
-      it.tEnd = o.tEnd + dt;
+    // trend / arrow
+    if (handle === 'p1') { it.p1 = { t: pt.t, price: pt.price }; }
+    else if (handle === 'p2') { it.p2 = { t: pt.t, price: pt.price }; }
+    else {
+      it.p1 = { t: o.p1.t + dt, price: o.p1.price + dp };
+      it.p2 = { t: o.p2.t + dt, price: o.p2.price + dp };
     }
   }
 
@@ -1624,77 +1482,28 @@ class DrawTools {
     const len2 = dx * dx + dy * dy;
     let t = len2 ? ((x - x1) * dx + (y - y1) * dy) / len2 : 0;
     t = Math.max(0, Math.min(1, t));
-    const px = x1 + t * dx, py = y1 + t * dy;
-    return Math.hypot(x - px, y - py);
-  }
-
-  _rayEnd(x1, y1, x2, y2, paneW) {
-    const dx = x2 - x1, dy = y2 - y1;
-    if (dx === 0 && dy === 0) return [x2, y2];
-    const tEdge = dx >= 0 ? (paneW - x1) / (dx || 1e-6) : (0 - x1) / dx;
-    const k = Math.max(tEdge, 1);
-    return [x1 + dx * k, y1 + dy * k];
+    return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
   }
 
   _hitTest(x, y) {
     const m = this._screen();
     if (!m.xOf) return null;
-    const paneW = this.cv._paneW(), paneH = this.cv._paneH();
+    const paneW = this.cv._paneW();
     const R = 7;
-    const ctx = this.canvas.getContext('2d');
-    ctx.font = '11px -apple-system, sans-serif';
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i];
-      if (it.type === 'hline') {
-        const yy = m.yOf(it.price);
-        if (yy != null && Math.abs(y - yy) < R) return { i, handle: 'body' };
-      } else if (it.type === 'vline') {
-        const xx = m.X(it.t);
-        if (Math.abs(x - xx) < R) return { i, handle: 'body' };
-      } else if (it.type === 'trend' || it.type === 'ray') {
-        const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
-        let x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
-        if (y1 == null || y2 == null) continue;
-        if (Math.hypot(x - x1, y - y1) < R) return { i, handle: 'p1' };
-        if (Math.hypot(x - x2, y - y2) < R) return { i, handle: 'p2' };
-        if (it.type === 'ray') [x2, y2] = this._rayEnd(x1, y1, x2, y2, paneW);
-        if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
-      } else if (it.type === 'rect') {
+      if (it.type === 'hray') {
+        const yy = m.yOf(it.price), x0 = m.X(it.t);
+        if (yy == null) continue;
+        if (Math.hypot(x - x0, y - yy) < R) return { i, handle: 'p1' };
+        if (Math.abs(y - yy) < R && x >= x0 - R) return { i, handle: 'body' };
+      } else {
         const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
         const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
         if (y1 == null || y2 == null) continue;
         if (Math.hypot(x - x1, y - y1) < R) return { i, handle: 'p1' };
         if (Math.hypot(x - x2, y - y2) < R) return { i, handle: 'p2' };
-        const lft = Math.min(x1, x2), rgt = Math.max(x1, x2);
-        const top = Math.min(y1, y2), bot = Math.max(y1, y2);
-        const nearBorder = (x > lft - R && x < rgt + R && (Math.abs(y - top) < R || Math.abs(y - bot) < R)) ||
-                           (y > top - R && y < bot + R && (Math.abs(x - lft) < R || Math.abs(x - rgt) < R));
-        const inside = x > lft && x < rgt && y > top && y < bot;
-        if (nearBorder || inside) return { i, handle: 'body' };
-      } else if (it.type === 'text') {
-        const tx = m.X(it.at.t), ty = m.yOf(it.at.price);
-        if (ty == null) continue;
-        const w = ctx.measureText(it.text).width;
-        if (x > tx - 3 && x < tx + w + 6 && y > ty - 16 && y < ty + 4) return { i, handle: 'body' };
-      } else if (it.type === 'brush') {
-        const pts = it.pts;
-        for (let k = 1; k < pts.length; k++) {
-          const x1 = m.X(pts[k - 1].t), y1 = m.yOf(pts[k - 1].price);
-          const x2 = m.X(pts[k].t), y2 = m.yOf(pts[k].price);
-          if (y1 == null || y2 == null) continue;
-          if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
-        }
-      } else if (it.type === 'pos') {
-        const x0 = m.X(it.entry.t), x1 = m.X(it.tEnd);
-        const yE = m.yOf(it.entry.price), yT = m.yOf(it.target), yS = m.yOf(it.stop);
-        if (yE == null || yT == null || yS == null) continue;
-        if (x >= x0 && x <= x1 + R) {
-          if (Math.abs(y - yT) < R) return { i, handle: 'target' };
-          if (Math.abs(y - yS) < R) return { i, handle: 'stop' };
-          if (Math.abs(x - x1) < R) return { i, handle: 'end' };
-          const top = Math.min(yT, yS), bot = Math.max(yT, yS);
-          if (y >= top - R && y <= bot + R) return { i, handle: 'body' };
-        }
+        if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
       }
     }
     return null;
@@ -1722,148 +1531,50 @@ class DrawTools {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    this.items.forEach((it, i) => this._renderItem(ctx, m, it, i === this.sel, paneW, paneH));
-    if (this.draft) this._renderDraft(ctx, m, paneW, paneH);
+    this.items.forEach((it, i) => this._renderItem(ctx, m, it, i === this.sel, paneW));
+    if (this.draft) {
+      if (this.draft.type === 'ruler') this._renderRuler(ctx, m, this.draft);
+      else this._renderItem(ctx, m, this.draft, false, paneW, true);
+    }
     if (this.ruler) this._renderRuler(ctx, m, this.ruler);
     ctx.restore();
   }
 
-  _stroke(ctx, pts, m) {
-    const P = pts.map(p => [m.X(p.t), m.yOf(p.price)]).filter(p => p[1] != null);
-    if (P.length < 2) return;
-    ctx.beginPath();
-    ctx.moveTo(P[0][0], P[0][1]);
-    for (let i = 1; i < P.length - 1; i++) {
-      const mx = (P[i][0] + P[i + 1][0]) / 2, my = (P[i][1] + P[i + 1][1]) / 2;
-      ctx.quadraticCurveTo(P[i][0], P[i][1], mx, my);
-    }
-    ctx.lineTo(P[P.length - 1][0], P[P.length - 1][1]);
-    ctx.stroke();
-  }
-
-  _renderItem(ctx, m, it, selected, paneW, paneH) {
-    if (it.type === 'hline') {
-      const y = m.yOf(it.price);
+  _renderItem(ctx, m, it, selected, paneW, isDraft = false) {
+    if (it.type === 'hray') {
+      const y = m.yOf(it.price), x0 = m.X(it.t);
       if (y == null) return;
       ctx.strokeStyle = '#e6edf3';
-      ctx.lineWidth = selected ? 2 : 1.2;
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(paneW, y); ctx.stroke();
+      ctx.lineWidth = selected ? 2 : 1.4;
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(paneW, y); ctx.stroke();
+      const label = this._fmt(it.price);
       ctx.fillStyle = '#e6edf3';
-      ctx.fillText(this._fmt(it.price), paneW - ctx.measureText(this._fmt(it.price)).width - 4, y - 4);
-    } else if (it.type === 'vline') {
-      const x = m.X(it.t);
-      ctx.strokeStyle = '#8b949e';
-      ctx.lineWidth = selected ? 2 : 1.2;
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, paneH); ctx.stroke();
-      if (selected) this._handles(ctx, [[x, paneH / 2]]);
-    } else if (it.type === 'trend' || it.type === 'ray') {
-      const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
-      let x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
-      if (y1 == null || y2 == null) return;
-      const hx = x2, hy = y2;
-      if (it.type === 'ray') [x2, y2] = this._rayEnd(x1, y1, x2, y2, paneW);
-      ctx.strokeStyle = '#58a6ff';
-      ctx.lineWidth = selected ? 2.4 : 1.6;
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-      if (selected) this._handles(ctx, [[x1, y1], [hx, hy]]);
-    } else if (it.type === 'rect') {
-      const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
-      const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
-      if (y1 == null || y2 == null) return;
-      const lft = Math.min(x1, x2), top = Math.min(y1, y2);
-      const w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
-      ctx.fillStyle = 'rgba(88,166,255,0.10)';
-      ctx.fillRect(lft, top, w, h);
-      ctx.strokeStyle = '#58a6ff';
-      ctx.lineWidth = selected ? 2 : 1.3;
-      ctx.strokeRect(lft, top, w, h);
-      if (selected) this._handles(ctx, [[x1, y1], [x2, y2]]);
-    } else if (it.type === 'text') {
-      const x = m.X(it.at.t), y = m.yOf(it.at.price);
-      if (y == null) return;
-      ctx.font = '12px -apple-system, sans-serif';
-      const w = ctx.measureText(it.text).width;
-      if (selected) {
-        ctx.fillStyle = 'rgba(88,166,255,0.12)';
-        ctx.fillRect(x - 3, y - 14, w + 6, 18);
-      }
-      ctx.fillStyle = '#e6edf3';
-      ctx.fillText(it.text, x, y);
-      ctx.font = '11px -apple-system, sans-serif';
-    } else if (it.type === 'brush') {
-      ctx.strokeStyle = '#e3b341';
-      ctx.lineWidth = selected ? 2.6 : 1.8;
-      this._stroke(ctx, it.pts, m);
-    } else if (it.type === 'pos') {
-      this._renderPos(ctx, m, it.entry, it.target, it.stop, it.tEnd, selected);
+      ctx.fillText(label, paneW - ctx.measureText(label).width - 4, y - 4);
+      if (selected) this._handles(ctx, [[x0, y]]);
+      return;
     }
-  }
 
-  _renderPos(ctx, m, entry, target, stop, tEnd, selected) {
-    const x0 = m.X(entry.t), x1 = m.X(tEnd);
-    const yE = m.yOf(entry.price), yT = m.yOf(target), yS = m.yOf(stop);
-    if (yE == null || yT == null || yS == null) return;
-    const wBox = x1 - x0;
-    ctx.fillStyle = 'rgba(38,166,154,0.14)';
-    ctx.fillRect(x0, Math.min(yE, yT), wBox, Math.abs(yT - yE));
-    ctx.fillStyle = 'rgba(239,83,80,0.14)';
-    ctx.fillRect(x0, Math.min(yE, yS), wBox, Math.abs(yS - yE));
-    for (const [y, c] of [[yE, '#e6edf3'], [yT, '#26a69a'], [yS, '#ef5350']]) {
-      ctx.strokeStyle = c;
-      ctx.lineWidth = selected ? 2 : 1.3;
-      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
-    }
-    const long = target > entry.price;
-    const tpPct = Math.abs(target - entry.price) / entry.price * 100;
-    const slPct = Math.abs(entry.price - stop) / entry.price * 100;
-    const rr = slPct > 0 ? tpPct / slPct : 0;
-    ctx.fillStyle = long ? '#26a69a' : '#ef5350';
-    ctx.fillText(`${long ? 'ЛОНГ' : 'ШОРТ'} · RR 1:${rr.toFixed(1)}`, x0 + 4, yE + (long ? 12 : -5));
-    ctx.fillStyle = '#26a69a';
-    ctx.fillText(`тейк ${this._fmt(target)} (${tpPct.toFixed(2)}%)`, x0 + 4, yT + (long ? -5 : 12));
-    ctx.fillStyle = '#ef5350';
-    ctx.fillText(`стоп ${this._fmt(stop)} (${slPct.toFixed(2)}%)`, x0 + 4, yS + (long ? 12 : -5));
-    if (selected) this._handles(ctx, [[x1, yT], [x1, yS], [x1, yE]]);
-  }
+    const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
+    const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
+    if (y1 == null || y2 == null) return;
+    ctx.strokeStyle = '#58a6ff';
+    ctx.lineWidth = selected ? 2.4 : 1.7;
+    if (isDraft) ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.setLineDash([]);
 
-  _renderDraft(ctx, m, paneW, paneH) {
-    const d = this.draft;
-    if (d.type === 'trend' || d.type === 'ray') {
-      const x1 = m.X(d.p1.t), y1 = m.yOf(d.p1.price);
-      let x2 = m.X(d.p2.t), y2 = m.yOf(d.p2.price);
-      if (y1 == null || y2 == null) return;
-      if (d.type === 'ray') [x2, y2] = this._rayEnd(x1, y1, x2, y2, paneW);
-      ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = '#58a6ff';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-      ctx.setLineDash([]);
-    } else if (d.type === 'rect') {
-      const x1 = m.X(d.p1.t), y1 = m.yOf(d.p1.price);
-      const x2 = m.X(d.p2.t), y2 = m.yOf(d.p2.price);
-      if (y1 == null || y2 == null) return;
-      ctx.fillStyle = 'rgba(88,166,255,0.08)';
-      ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
-      ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = '#58a6ff';
-      ctx.lineWidth = 1.3;
-      ctx.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
-      ctx.setLineDash([]);
-    } else if (d.type === 'ruler') {
-      this._renderRuler(ctx, m, d);
-    } else if (d.type === 'brush') {
-      ctx.strokeStyle = '#e3b341';
-      ctx.lineWidth = 1.8;
-      this._stroke(ctx, d.pts, m);
-    } else if (d.type === 'pos') {
-      const hoverP = d.hover ? d.hover.price : d.entry.price;
-      const target = d.stage === 1 ? hoverP : d.target;
-      const stop = d.stage === 1 ? d.entry.price - (target - d.entry.price) : hoverP;
-      const bars = Math.max(20, Math.round((this.cv._paneW() / 12) / 2));
-      this._renderPos(ctx, m, d.entry, target, stop, d.entry.t + bars * this._iv(), false);
-      ctx.fillStyle = '#8b949e';
-      ctx.fillText(d.stage === 1 ? 'клик 2 — тейк' : 'клик 3 — стоп', m.X(d.entry.t) + 4, m.yOf(d.entry.price) - 18);
+    if (it.type === 'arrow') {
+      // наконечник в конечной точке
+      const a = Math.atan2(y2 - y1, x2 - x1), L = 11, w = 0.42;
+      ctx.fillStyle = '#58a6ff';
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - L * Math.cos(a - w), y2 - L * Math.sin(a - w));
+      ctx.lineTo(x2 - L * Math.cos(a + w), y2 - L * Math.sin(a + w));
+      ctx.closePath();
+      ctx.fill();
     }
+    if (selected) this._handles(ctx, [[x1, y1], [x2, y2]]);
   }
 
   _renderRuler(ctx, m, r) {
