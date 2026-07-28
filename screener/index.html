@@ -435,6 +435,61 @@ footer {
 }
 .draw-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ---------- поиск и избранное ---------- */
+.controls input#inpSearch {
+  width: 150px; padding: 5px 9px;
+  background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+  color: #e6edf3; font: 12px -apple-system, "Segoe UI", Roboto, sans-serif;
+  outline: none;
+}
+.controls input#inpSearch:focus { border-color: #1f6feb; }
+.controls input#inpSearch::placeholder { color: #6e7681; }
+
+.coin .fav {
+  font-size: 13px; line-height: 1; color: #6e7681;
+  cursor: pointer; padding: 2px 3px; border-radius: 4px;
+}
+.coin .fav:hover { color: #e3b341; background: #21262d; }
+.coin .fav.on { color: #e3b341; }
+.coin .rank { flex: 0 0 auto; }
+
+.sb-empty { padding: 16px 12px; color: #6e7681; font-size: 12px; text-align: center; }
+
+/* ---------- мобильная раскладка ---------- */
+@media (max-width: 760px) {
+  header { flex-wrap: wrap; gap: 6px 8px; padding: 8px 10px; }
+  .brand { font-size: 14px; }
+  .brand .sub { display: none; }
+  .tabs { margin-left: auto; }
+
+  .controls { width: 100%; margin-left: 0; gap: 8px; flex-wrap: wrap; }
+  /* поиск — отдельной строкой во всю ширину, чтобы не сжимался */
+  .controls input#inpSearch { order: -1; flex: 1 0 100%; width: auto; padding: 7px 10px; font-size: 13px; }
+  .controls label { font-size: 11px; }
+  .controls select { padding: 5px 6px; }
+  .controls button { padding: 6px 10px; }
+  #status { display: none; }
+
+  /* список монет — горизонтальной лентой над графиком */
+  #layout { flex-direction: column; }
+  aside#sidebar {
+    width: 100%; max-height: none; height: auto;
+    display: flex; overflow-x: auto; overflow-y: hidden;
+    border-right: none; border-bottom: 1px solid #21262d;
+    -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+  }
+  .coin { min-width: 158px; scroll-snap-align: start; }
+  .coin .row2.row3, .coin .chips { display: none; }
+
+  main { min-height: 0; }
+  #symbolBar { font-size: 13px; }
+  #layerBar { overflow-x: auto; white-space: nowrap; }
+  #summary { font-size: 11px; max-height: 54px; overflow-y: auto; }
+  .chartWrap { height: 58vh; }
+  .tabs button { padding: 7px 13px; font-size: 13px; }
+  footer { font-size: 10px; padding: 5px 8px; line-height: 1.25; }
+}
+
 </style>
 </head>
 <body>
@@ -446,6 +501,7 @@ footer {
     <button data-mode="m1">1M</button>
   </nav>
   <div class="controls">
+    <input id="inpSearch" type="search" placeholder="Монета (BTC, SOL…)" autocomplete="off" spellcheck="false">
     <label>Топ
       <select id="selN">
         <option value="5" selected>5</option>
@@ -1663,12 +1719,27 @@ const state = {
   mode: 'm15',
   symbol: null,
   top: [],
+  all: [],        // все USDT-тикеры Bybit — для поиска любой монеты, не только топа
   n: 5,
   minTurnover: 30e6,
   busy: false,
   queued: false,
   formations: [],
+  search: '',
 };
+
+/* ---------- избранное (закреплённые монеты) ---------- */
+const FAVS_KEY = 'smc_favs';
+let FAVS = [];
+try { FAVS = JSON.parse(localStorage.getItem(FAVS_KEY) || '[]'); } catch (e) { FAVS = []; }
+function saveFavs() { localStorage.setItem(FAVS_KEY, JSON.stringify(FAVS)); }
+function isFav(sym) { return FAVS.includes(sym); }
+function toggleFav(sym) {
+  const i = FAVS.indexOf(sym);
+  if (i >= 0) FAVS.splice(i, 1); else FAVS.push(sym);
+  saveFavs();
+  renderSidebar();
+}
 
 const charts = {};
 
@@ -2079,10 +2150,14 @@ async function loadRanking() {
         oiv: +t.openInterestValue,
         chips: null,
       }))
-      .filter(r => r.to >= state.minTurnover && r.vol > 0 && isFinite(r.vol));
+      .filter(r => r.vol > 0 && isFinite(r.vol));
     rows.forEach(r => { r.score = r.vol * Math.log10(Math.max(10, r.to)); });
     rows.sort((a, b) => b.score - a.score);
-    state.top = rows.slice(0, state.n);
+    // все монеты держим для поиска и избранного, в топ идут только «живые» по обороту
+    const prev = new Map(state.all.map(r => [r.sym, r.chips]));
+    rows.forEach(r => { r.chips = prev.has(r.sym) ? prev.get(r.sym) : null; });
+    state.all = rows;
+    state.top = rows.filter(r => r.to >= state.minTurnover).slice(0, state.n);
     renderSidebar();
     setStatus('обновлено ' + new Date().toLocaleTimeString());
     if (!state.symbol && state.top.length) selectSymbol(state.top[0].sym);
@@ -2092,8 +2167,23 @@ async function loadRanking() {
   }
 }
 
+// какие монеты показываем в сайдбаре: избранные сверху, затем топ по волатильности,
+// а при поиске — совпадения по тикеру среди всех монет биржи
+function sidebarRows() {
+  const q = state.search.trim().toUpperCase();
+  if (q) {
+    return state.all
+      .filter(r => r.sym.replace('USDT', '').includes(q))
+      .slice(0, 30);
+  }
+  const byS = new Map(state.all.map(r => [r.sym, r]));
+  const favs = FAVS.map(s => byS.get(s)).filter(Boolean);
+  const rest = state.top.filter(r => !isFav(r.sym));
+  return favs.concat(rest);
+}
+
 async function fetchBadges() {
-  for (const r of state.top) {
+  for (const r of sidebarRows().slice(0, 12)) {
     try {
       const cs = await klines(r.sym, '1', 240);
       const A = SMC.analyze(cs, { sweepLb: 60, knifeLb: 60, consolWin: 30 });
@@ -2118,11 +2208,18 @@ async function fetchBadges() {
 
 function renderSidebar() {
   const el = $('#sidebar');
-  el.innerHTML = state.top.map((r, idx) => `
+  const rows = sidebarRows();
+  if (!rows.length) {
+    el.innerHTML = `<div class="sb-empty">${state.search ? 'Ничего не найдено' : 'Загрузка…'}</div>`;
+    return;
+  }
+  el.innerHTML = rows.map((r, idx) => `
     <div class="coin ${r.sym === state.symbol ? 'active' : ''}" data-sym="${r.sym}">
       <div class="row1">
-        <span class="rank">${idx + 1}</span>
+        <span class="rank">${isFav(r.sym) ? '★' : idx + 1}</span>
         <b>${r.sym.replace('USDT', '')}</b>
+        <span class="fav ${isFav(r.sym) ? 'on' : ''}" data-fav="${r.sym}"
+              title="${isFav(r.sym) ? 'Убрать из избранного' : 'В избранное'}">${isFav(r.sym) ? '★' : '☆'}</span>
         <span class="chg ${r.chg >= 0 ? 'pos' : 'neg'}">${fmtPct(r.chg)}</span>
       </div>
       <div class="row2">
@@ -2233,8 +2330,28 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const k of ['tf15', 'tf5', 'tf1']) charts[k].drawTools = new DrawTools(charts[k]);
 
   $('#sidebar').addEventListener('click', e => {
+    const star = e.target.closest('[data-fav]');
+    if (star) { e.stopPropagation(); toggleFav(star.dataset.fav); return; }
     const c = e.target.closest('.coin');
     if (c) selectSymbol(c.dataset.sym);
+  });
+
+  // поиск монеты: фильтрует список, Enter открывает первую найденную
+  const inpSearch = $('#inpSearch');
+  inpSearch.addEventListener('input', () => {
+    state.search = inpSearch.value;
+    renderSidebar();
+  });
+  inpSearch.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const first = sidebarRows()[0];
+      if (first) { selectSymbol(first.sym); inpSearch.blur(); }
+    } else if (e.key === 'Escape') {
+      inpSearch.value = '';
+      state.search = '';
+      renderSidebar();
+      inpSearch.blur();
+    }
   });
 
   document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
