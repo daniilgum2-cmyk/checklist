@@ -1136,9 +1136,9 @@ class DrawTools {
     bar.className = 'draw-toolbar';
     const groups = [
       [['cursor', 'Курсор — выбрать, подвинуть', 'Esc']],
-      [['trend', 'Линия тренда', 'Alt+T'],
+      [['trend', 'Линия тренда (Shift — ровно)', 'Alt+T'],
        ['hray', 'Горизонтальный луч (уровень вправо)', 'Alt+H'],
-       ['arrow', 'Стрелка — траектория', 'Alt+A']],
+       ['arrow', 'Стрелка — траектория (Shift — ровно)', 'Alt+A']],
       [['ruler', 'Линейка (или Shift+протянуть)', 'Alt+M']],
     ];
     this.btns = {};
@@ -1348,6 +1348,30 @@ class DrawTools {
     return x >= 0 && x <= this.cv._paneW() && y >= 0 && y <= this.cv._paneH();
   }
 
+  // Shift — ровная линия: строго горизонталь, вертикаль или 45° (как в TradingView).
+  // Направление берём по движению КУРСОРА от точки нажатия (sx, sy), а строим от
+  // якоря from: иначе магнит уводит якорь и «горизонтальное» ведение уходит в 45°.
+  // Магнит при выравнивании не применяем — привязка к OHLC ломала бы ровность.
+  _constrain(from, x, y, sx, sy) {
+    const m = this._screen();
+    const x0 = m.X(from.t), y0 = m.yOf(from.price);
+    if (y0 == null) return this._pt(x, y);
+    const dx = (sx != null ? x - sx : x - x0);
+    const dy = (sy != null ? y - sy : y - y0);
+    const adx = Math.abs(dx), ady = Math.abs(dy);
+    const K = 2.414;  // tan(67.5°) — сектор «почти горизонтально/вертикально»
+    if (adx > ady * K) {
+      const pt = this._pt(x, y, false);
+      return pt ? { t: pt.t, price: from.price } : null;   // ровная горизонталь
+    }
+    if (ady > adx * K) {
+      const pt = this._pt(x, y, false);
+      return pt ? { t: from.t, price: pt.price } : null;   // ровная вертикаль
+    }
+    const len = (adx + ady) / 2;                            // ровные 45° от якоря
+    return this._pt(x0 + Math.sign(dx) * len, y0 + Math.sign(dy) * len, false);
+  }
+
   _fmt(v) { return v.toFixed(this.cv.precision || 2); }
 
   /* ---------- события ---------- */
@@ -1397,7 +1421,8 @@ class DrawTools {
       this._save();
       this.setTool('cursor');
     } else if (this.tool === 'trend' || this.tool === 'arrow' || this.tool === 'ruler') {
-      this.draft = { type: this.tool, p1: pt, p2: pt };
+      // sx/sy — экранная точка нажатия: по ней считаем направление при Shift
+      this.draft = { type: this.tool, p1: pt, p2: pt, sx: x, sy: y };
     }
     this.cv.requestDraw();
   }
@@ -1415,15 +1440,30 @@ class DrawTools {
       const o = this.drag.orig;
       const l0 = this.cv.chart.timeScale().coordinateToLogical(this.drag.x0);
       const l1 = this.cv.chart.timeScale().coordinateToLogical(x);
-      const dt = (l0 != null && l1 != null) ? (l1 - l0) * this._iv() : 0;
+      let dt = (l0 != null && l1 != null) ? (l1 - l0) * this._iv() : 0;
       const p0 = this.cv.series.coordinateToPrice(this.drag.y0);
-      const dp = p0 != null ? pt.price - p0 : 0;
-      this._applyDrag(it, o, this.drag.handle, dt, dp, pt);
+      let dp = p0 != null ? pt.price - p0 : 0;
+      let dragPt = pt;
+      if (e.shiftKey) {
+        if (this.drag.handle === 'p1' || this.drag.handle === 'p2') {
+          // тянем конец линии — выравниваем относительно противоположной точки
+          const anchor = this.drag.handle === 'p1' ? o.p2 : o.p1;
+          if (anchor) dragPt = this._constrain(anchor, cx, cy, this.drag.x0, this.drag.y0) || pt;
+        } else {
+          // двигаем рисунок целиком — только по одной оси
+          if (Math.abs(cx - this.drag.x0) >= Math.abs(cy - this.drag.y0)) dp = 0;
+          else dt = 0;
+        }
+      }
+      this._applyDrag(it, o, this.drag.handle, dt, dp, dragPt);
       this.cv.requestDraw();
       return;
     }
     if (this.draft) {
-      this.draft.p2 = pt;
+      // Shift во время рисования — ровная линия (горизонт/вертикаль/45°)
+      this.draft.p2 = (e.shiftKey && this.draft.type !== 'ruler')
+        ? (this._constrain(this.draft.p1, cx, cy, this.draft.sx, this.draft.sy) || pt)
+        : pt;
       this.cv.requestDraw();
     }
   }
