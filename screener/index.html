@@ -1743,6 +1743,34 @@ function toggleFav(sym) {
 
 const charts = {};
 
+/* График создаём ТОЛЬКО когда его вкладка видима. Если создать его в скрытом
+   контейнере (ширина 0), lightweight-charts схлопывает barSpacing в минимум и
+   больше не восстанавливает — свечи «уезжают» вправо, а слева пустота. */
+const CHART_SLOTS = { m15: ['tf15', '#chartTf15'], m5: ['tf5', '#chartTf5'], m1: ['tf1', '#chartTf1'] };
+function ensureChart(mode) {
+  const [key, sel] = CHART_SLOTS[mode];
+  const el = $(sel);
+  let cv = charts[key];
+  // Если масштаб всё же залип (barSpacing упал в минимум, слева пустота), вылечить
+  // его через API графика нельзя — ни fitContent, ни setVisibleLogicalRange, ни
+  // resize не действуют. Пересоздаём график целиком; рисунки лежат в localStorage.
+  if (cv && el.clientWidth > 0 && cv.candles) {
+    const ts = cv.chart.timeScale();
+    const r = ts.getVisibleLogicalRange();
+    if (ts.options().barSpacing <= 0.6 || (r && r.from < -50)) {
+      try { cv.chart.remove(); } catch (e) {}
+      el.innerHTML = '';
+      cv = null;
+    }
+  }
+  if (!cv) {
+    cv = new ChartView(el);
+    cv.drawTools = new DrawTools(cv);
+    charts[key] = cv;
+  }
+  return cv;
+}
+
 const VIEWS = {
   m15: '#viewM15',
   m5: '#viewM5',
@@ -2276,7 +2304,7 @@ async function refreshCharts(fit = false) {
       const price = cs[cs.length - 1].c;
       let m = null;
       try { m = await Metrics.get(sym, fundingOf(sym)); } catch (e) {}
-      const cv = charts[{ m15: 'tf15', m5: 'tf5', m1: 'tf1' }[mode]];
+      const cv = ensureChart(mode);
       if (cv.drawTools) cv.drawTools.setSymbol(sym);
       cv.setPrecision(price);
       cv.setTitle(`${sym} · ${cfg.label}`);
@@ -2324,10 +2352,7 @@ function setMode(mode) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  charts.tf15 = new ChartView($('#chartTf15'));
-  charts.tf5 = new ChartView($('#chartTf5'));
-  charts.tf1 = new ChartView($('#chartTf1'));
-  for (const k of ['tf15', 'tf5', 'tf1']) charts[k].drawTools = new DrawTools(charts[k]);
+  ensureChart(state.mode);  // остальные ТФ создадутся при первом открытии их вкладки
 
   $('#sidebar').addEventListener('click', e => {
     const star = e.target.closest('[data-fav]');
@@ -2370,6 +2395,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   loadRanking();
+  // страховка: вёрстка устоялась — проверяем масштаб графика и чиним, если залип
+  setTimeout(() => refreshCharts(true), 900);
   setInterval(() => refreshCharts(false), 25000);
   setInterval(loadRanking, 90000);
 });
