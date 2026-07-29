@@ -36,18 +36,49 @@ header {
 .brand { font-weight: 700; font-size: 15px; color: #e6edf3; }
 .brand .sub { font-weight: 400; font-size: 11px; color: #8b949e; margin-left: 4px; }
 
-.tabs { display: flex; gap: 4px; }
-.tabs button {
-  background: transparent;
+/* выбор таймфрейма одной кнопкой со списком (как в TradingView) */
+.tfpick { position: relative; }
+.tfpick > button {
+  display: flex; align-items: center; gap: 6px;
+  background: #21262d;
   border: 1px solid #30363d;
-  color: #8b949e;
-  padding: 5px 12px;
+  color: #e6edf3;
+  padding: 5px 10px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 600;
+  min-width: 62px;
 }
-.tabs button.active { background: #1f6feb22; border-color: #1f6feb; color: #e6edf3; }
-.tabs button:hover { color: #e6edf3; }
+.tfpick > button:hover { background: #30363d; }
+.tfpick > button i { font-style: normal; font-size: 9px; color: #8b949e; margin-left: auto; }
+#tfMenu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 40;
+  min-width: 100%;
+  padding: 4px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(1, 4, 9, 0.7);
+}
+#tfMenu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #c9d1d9;
+  padding: 7px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+#tfMenu button:hover { background: #21262d; color: #e6edf3; }
+#tfMenu button.active { background: #1f6feb22; color: #e6edf3; font-weight: 600; }
 
 .controls { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 12px; color: #8b949e; }
 .controls select {
@@ -464,7 +495,7 @@ footer {
   header { flex-wrap: wrap; gap: 6px 8px; padding: 8px 10px; }
   .brand { font-size: 14px; }
   .brand .sub { display: none; }
-  .tabs { margin-left: auto; }
+  .tfpick { margin-left: auto; }
 
   .controls { width: 100%; margin-left: 0; gap: 8px; flex-wrap: wrap; }
   /* поиск — отдельной строкой во всю ширину, чтобы не сжимался */
@@ -490,7 +521,8 @@ footer {
   #layerBar { overflow-x: auto; white-space: nowrap; }
   #summary { font-size: 11px; max-height: 54px; overflow-y: auto; }
   .chartWrap { height: 58vh; }
-  .tabs button { padding: 7px 13px; font-size: 13px; }
+  .tfpick > button { padding: 7px 13px; font-size: 13px; }
+  #tfMenu button { padding: 9px 14px; font-size: 13px; }
   footer { font-size: 10px; padding: 5px 8px; line-height: 1.25; }
 }
 
@@ -499,10 +531,9 @@ footer {
 <body>
 <header>
   <div class="brand">SMC-скринер <span class="sub">Bybit Futures</span></div>
-  <nav class="tabs">
-    <button data-mode="m15" class="active">15M</button>
-    <button data-mode="m5">5M</button>
-    <button data-mode="m1">1M</button>
+  <nav class="tfpick">
+    <button id="btnTf" type="button" aria-haspopup="true" aria-expanded="false" title="Таймфрейм"><span id="curTf">15M</span><i>▾</i></button>
+    <div id="tfMenu" hidden></div>
   </nav>
   <div class="controls">
     <input id="inpSearch" type="search" placeholder="Монета (BTC, SOL…)" autocomplete="off" spellcheck="false">
@@ -535,6 +566,12 @@ footer {
     </div>
     <div id="layerBar"></div>
     <div id="summary"></div>
+    <section id="viewD1" class="charts" hidden>
+      <div class="chartWrap"><div class="chart" id="chartTfD1"></div></div>
+    </section>
+    <section id="viewH4" class="charts" hidden>
+      <div class="chartWrap"><div class="chart" id="chartTfH4"></div></div>
+    </section>
     <section id="viewM15" class="charts">
       <div class="chartWrap"><div class="chart" id="chartTf15"></div></div>
     </section>
@@ -1945,7 +1982,10 @@ const charts = {};
 /* График создаём ТОЛЬКО когда его вкладка видима. Если создать его в скрытом
    контейнере (ширина 0), lightweight-charts схлопывает barSpacing в минимум и
    больше не восстанавливает — свечи «уезжают» вправо, а слева пустота. */
-const CHART_SLOTS = { m15: ['tf15', '#chartTf15'], m5: ['tf5', '#chartTf5'], m1: ['tf1', '#chartTf1'] };
+const CHART_SLOTS = {
+  d1: ['tfD1', '#chartTfD1'], h4: ['tfH4', '#chartTfH4'],
+  m15: ['tf15', '#chartTf15'], m5: ['tf5', '#chartTf5'], m1: ['tf1', '#chartTf1'],
+};
 function ensureChart(mode) {
   const [key, sel] = CHART_SLOTS[mode];
   const el = $(sel);
@@ -1971,6 +2011,8 @@ function ensureChart(mode) {
 }
 
 const VIEWS = {
+  d1: '#viewD1',
+  h4: '#viewH4',
   m15: '#viewM15',
   m5: '#viewM5',
   m1: '#viewM1',
@@ -1992,11 +2034,17 @@ function saveLayers() { localStorage.setItem('smc_layers', JSON.stringify(LAYERS
 // limit 1000 — максимум, который отдаёт Bybit за запрос: 15M ≈ 10 дней истории,
 // 5M ≈ 3.5 дня, 1M ≈ 16 часов. На экране показываем последние ~140 баров,
 // остальное доступно прокруткой влево.
+/* limit 1000 — максимум Bybit за запрос: 1M ≈ 16 ч истории, 15M ≈ 10 дней, 4H ≈ 5 месяцев,
+   1D — всё, что есть у монеты. bands (премиум/дисконт) рисуем на старших ТФ, extremes
+   (хай/лой окна) — на младших, где нужна ближняя цель. */
 const TF_CFG = {
-  m15: { interval: '15', minPerBar: 15, label: '15M', limit: 1000, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
-  m5: { interval: '5', minPerBar: 5, label: '5M', limit: 1000, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
-  m1: { interval: '1', minPerBar: 1, label: '1M', limit: 1000, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
+  m1: { interval: '1', minPerBar: 1, label: '1M', limit: 1000, bands: false, extremes: true, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
+  m5: { interval: '5', minPerBar: 5, label: '5M', limit: 1000, bands: false, extremes: true, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
+  m15: { interval: '15', minPerBar: 15, label: '15M', limit: 1000, bands: true, extremes: false, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
+  h4: { interval: '240', minPerBar: 240, label: '4H', limit: 1000, bands: true, extremes: false, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
+  d1: { interval: 'D', minPerBar: 1440, label: '1D', limit: 1000, bands: true, extremes: false, opts: { sweepLb: 90, knifeLb: 90, consolWin: 20, rangeLb: 120 } },
 };
+const TF_ORDER = ['m1', 'm5', 'm15', 'h4', 'd1'];  // порядок в выпадашке, от младшего к старшему
 
 /* ---------- форматирование ---------- */
 const fmtUsd = v => v >= 1e9 ? '$' + (v / 1e9).toFixed(1) + 'B'
@@ -2163,6 +2211,13 @@ function metricItems(m) {
   return items;
 }
 
+// возраст события: минуты на младших ТФ, часы и дни — на старших
+function agoText(mins) {
+  if (mins < 90) return `${mins} мин`;
+  if (mins < 2880) return `${(mins / 60).toFixed(mins < 600 ? 1 : 0)} ч`;
+  return `${Math.round(mins / 1440)} дн`;
+}
+
 function tfSummary(cs, A, label, minPerBar, m) {
   const price = cs[cs.length - 1].c;
   const last = cs.length - 1;
@@ -2176,12 +2231,14 @@ function tfSummary(cs, A, label, minPerBar, m) {
   const lq = nearestLiquidity(A, price);
   if (lq.below) items.push(`<b>ликвидность за лоями:</b> ${fmtPrice(lq.below.price)} (EQL×${lq.below.count})`);
   if (lq.above) items.push(`<b>ликвидность за хаями:</b> ${fmtPrice(lq.above.price)} (EQH×${lq.above.count})`);
+  // «свежо» — последние 45 минут, но не меньше трёх баров: на 4H и 1D минуты бессмысленны
+  const fresh = Math.max(3, Math.round(45 / minPerBar));
   const sw = A.sweeps[A.sweeps.length - 1];
-  if (sw && (last - sw.i) * minPerBar <= 45) {
-    items.push(`<b>снятие (SFP):</b> ${(last - sw.i) * minPerBar} мин назад, ${sw.dir === 1 ? 'лой снят → смотрим лонг' : 'хай снят → смотрим шорт'}`);
+  if (sw && last - sw.i <= fresh) {
+    items.push(`<b>снятие (SFP):</b> ${agoText((last - sw.i) * minPerBar)} назад, ${sw.dir === 1 ? 'лой снят → смотрим лонг' : 'хай снят → смотрим шорт'}`);
   }
   const kn = A.knives[A.knives.length - 1];
-  if (kn && (last - kn.i) * minPerBar <= 45) items.push(`<b>нож:</b> ${(last - kn.i) * minPerBar} мин назад (${kn.dir === -1 ? 'вниз' : 'вверх'})`);
+  if (kn && last - kn.i <= fresh) items.push(`<b>нож:</b> ${agoText((last - kn.i) * minPerBar)} назад (${kn.dir === -1 ? 'вниз' : 'вверх'})`);
   return items.concat(metricItems(m));
 }
 
@@ -2527,10 +2584,12 @@ async function refreshCharts(fit = false) {
       try { m = await Metrics.get(sym, fundingOf(sym)); } catch (e) {}
       const cv = ensureChart(mode);
       if (cv.drawTools) cv.drawTools.setSymbol(sym);
+      // на дневках время на оси не нужно — только даты
+      cv.chart.applyOptions({ timeScale: { timeVisible: cfg.minPerBar < 1440 } });
       cv.setPrecision(price);
       cv.setTitle(`${sym} · ${cfg.label}`);
       cv.setData(cs, { fit });
-      const d = buildDrawings(cs, A, { bands: mode === 'm15', maxOB: 3, maxFVG: 4, maxEvents: 6, extremes: mode !== 'm15' });
+      const d = buildDrawings(cs, A, { bands: cfg.bands, maxOB: 3, maxFVG: 4, maxEvents: 6, extremes: cfg.extremes });
       d.hlines.push(...wallLines(m));
       cv.setDrawings(d);
       cv.setMarkers(buildMarkers(cs, A));
@@ -2567,9 +2626,24 @@ function setStatus(msg, err = false) {
 /* ---------- инициализация ---------- */
 function setMode(mode) {
   state.mode = mode;
-  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  $('#curTf').textContent = TF_CFG[mode].label;
+  tfMenu(false);
   for (const [m, sel] of Object.entries(VIEWS)) $(sel).hidden = m !== mode;
   refreshCharts(true);
+}
+
+/* Выбор таймфрейма одной кнопкой (как в TradingView): клик — список, клик по пункту —
+   переключение. open = true/false принудительно, без аргумента — переключить. */
+function tfMenu(open) {
+  const menu = $('#tfMenu');
+  const show = open == null ? menu.hidden : open;
+  if (show) {
+    menu.innerHTML = TF_ORDER
+      .map(k => `<button type="button" data-mode="${k}"${k === state.mode ? ' class="active"' : ''}>${TF_CFG[k].label}</button>`)
+      .join('');
+  }
+  menu.hidden = !show;
+  $('#btnTf').setAttribute('aria-expanded', show ? 'true' : 'false');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2600,7 +2674,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('#curTf').textContent = TF_CFG[state.mode].label;
+  $('#btnTf').addEventListener('click', e => { e.stopPropagation(); tfMenu(); });
+  $('#tfMenu').addEventListener('click', e => {
+    const b = e.target.closest('[data-mode]');
+    if (b) setMode(b.dataset.mode);
+  });
+  document.addEventListener('click', () => tfMenu(false));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') tfMenu(false); });
   $('#selN').addEventListener('change', e => { state.n = +e.target.value; loadRanking(); });
   $('#selTo').addEventListener('change', e => { state.minTurnover = +e.target.value; loadRanking(); });
   $('#btnRefresh').addEventListener('click', () => { loadRanking(); refreshCharts(false); });
