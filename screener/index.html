@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Telegram Mini App кэширует страницу — просим не держать старую версию -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>SMC-скринер · Bybit Futures</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -936,7 +940,15 @@ class ChartView {
     // СИНХРОННО (не requestDraw): при пане/зуме оверлей должен двигаться в том же
     // кадре, что и свечи — через rAF разметка «висит в воздухе» и доклеивается позже
     this.chart.timeScale().subscribeVisibleLogicalRangeChange(() => this.draw());
-    new ResizeObserver(() => this.requestDraw()).observe(el);
+    new ResizeObserver(() => {
+      // появилась ширина — отдаём отложенные данные и подгоняем вид
+      if (this._pending && el.clientWidth > 0) {
+        const p = this._pending;
+        this._pending = null;
+        this.setData(p.candles, { fit: true });
+      }
+      this.requestDraw();
+    }).observe(el);
     // вертикальный пан шкалы цены и автоскейл НЕ дают событий — следим сами:
     // каждый кадр сверяем маппинг цена→пиксель и перерисовываем при сдвиге
     const watch = () => {
@@ -966,6 +978,10 @@ class ChartView {
   }
 
   setData(candles, { fit = false } = {}) {
+    // В Telegram Mini App окно разворачивается с анимацией: контейнер какое-то время
+    // имеет нулевую ширину. Если отдать данные графику в этот момент, масштаб
+    // схлопывается навсегда. Ждём реальной ширины (сработает ResizeObserver ниже).
+    if (!this.el.clientWidth) { this._pending = { candles, fit }; return; }
     const ts = this.chart.timeScale();
     const prevRange = this.candles && !fit ? ts.getVisibleRange() : null;
     this.candles = candles;
@@ -1790,10 +1806,13 @@ const LAYERS = Object.assign(
 );
 function saveLayers() { localStorage.setItem('smc_layers', JSON.stringify(LAYERS)); }
 
+// limit 1000 — максимум, который отдаёт Bybit за запрос: 15M ≈ 10 дней истории,
+// 5M ≈ 3.5 дня, 1M ≈ 16 часов. На экране показываем последние ~140 баров,
+// остальное доступно прокруткой влево.
 const TF_CFG = {
-  m15: { interval: '15', minPerBar: 15, label: '15M', limit: 400, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
-  m5: { interval: '5', minPerBar: 5, label: '5M', limit: 300, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
-  m1: { interval: '1', minPerBar: 1, label: '1M', limit: 300, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
+  m15: { interval: '15', minPerBar: 15, label: '15M', limit: 1000, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
+  m5: { interval: '5', minPerBar: 5, label: '5M', limit: 1000, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
+  m1: { interval: '1', minPerBar: 1, label: '1M', limit: 1000, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
 };
 
 /* ---------- форматирование ---------- */
