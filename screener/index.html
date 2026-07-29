@@ -983,13 +983,59 @@ class ChartView {
     // схлопывается навсегда. Ждём реальной ширины (сработает ResizeObserver ниже).
     if (!this.el.clientWidth) { this._pending = { candles, fit }; return; }
     this._pending = null;  // данные дошли — отложенные свечи больше не нужны
-    const ts = this.chart.timeScale();
-    const prevRange = this.candles && !fit ? ts.getVisibleRange() : null;
+    this._dataLen = candles.length;
+    // Обычное обновление той же монеты — доливаем свечи, а не перезаливаем график:
+    // так масштаб и позиция не сбиваются, а у правого края график сам идёт за ценой.
+    if (!fit && this._patch(candles)) return;
     this.candles = candles;
     this.series.setData(candles.map(c => ({ time: c.t, open: c.o, high: c.h, low: c.l, close: c.c })));
-    if (prevRange) ts.setVisibleRange(prevRange);
-    else this.resetView();
+    this.resetView();
     this.requestDraw();
+  }
+
+  /* Доливка свежих свечей через series.update(). Возвращает false, если ряды не
+     стыкуются (другая монета/ТФ, пропущенный кусок) — тогда перезаливаем целиком. */
+  _patch(candles) {
+    const old = this.candles;
+    if (!old || old.length < 2 || !candles || !candles.length) return false;
+    const iv = old[1].t - old[0].t;
+    if (!iv || (candles.length > 1 && candles[1].t - candles[0].t !== iv)) return false;
+    const lastT = old[old.length - 1].t;
+    if (candles[0].t > lastT + iv) return false;              // между рядами дыра
+    if (candles[0].t < old[0].t) return false;                // пришла история глубже — только перезаливом
+    const i0 = candles.findIndex(c => c.t >= lastT);
+    if (i0 < 0) return false;                                 // пришло старьё
+
+    // следовать за новой свечой только если ты у правого края; если ушёл в
+    // историю — график остаётся на месте (как в TradingView)
+    this.chart.timeScale().applyOptions({ shiftVisibleRangeOnNewBar: this._atRightEdge() });
+    for (let i = i0; i < candles.length; i++) {
+      const c = candles[i];
+      this.series.update({ time: c.t, open: c.o, high: c.h, low: c.l, close: c.c });
+    }
+    // Bybit отдаёт скользящее окно, но в графике старые свечи остаются — держим
+    // такой же склеенный ряд, иначе разметка съедет по индексам.
+    const head = [];
+    for (const c of old) { if (c.t >= candles[0].t) break; head.push(c); }
+    this.candles = head.concat(candles);
+    this.requestDraw();
+    return true;
+  }
+
+  /* Живая свеча: дописываем только последние бары, разметку не пересчитываем.
+     _dataLen двигаем на столько же, чтобы индексы разметки остались на месте. */
+  pushLast(candles) {
+    if (!this.el.clientWidth || this._pending || !this.candles) return false;
+    const before = this.candles.length;
+    if (!this._patch(candles)) return false;
+    this._dataLen += this.candles.length - before;
+    return true;
+  }
+
+  // видна ли последняя свеча (стоим ли «в моменте»)
+  _atRightEdge() {
+    const lr = this.chart.timeScale().getVisibleLogicalRange();
+    return !lr || lr.to >= this.candles.length - 3;
   }
 
   // сброс: последние ~140 баров + автомасштаб цены (чтобы график не «терялся» при смене монеты)
@@ -1066,6 +1112,10 @@ class ChartView {
 
     const xOf = this._xMapper();
     if (!xOf) return;
+    // разметку считали по последнему запросу свечей, а в графике могут лежать ещё
+    // и более старые (доливка) — сдвигаем индексы на эту разницу
+    const off = this.candles.length - (this._dataLen || this.candles.length);
+    const xAt = i => xOf(i + off);
     const yOf = p => this.series.priceToCoordinate(p);
     const paneW = this._paneW(), paneH = this._paneH();
 
@@ -1091,8 +1141,8 @@ class ChartView {
 
     // зоны: OB / FVG / боксы консолидации
     for (const z of d.zones || []) {
-      const x1 = xOf(z.i0);
-      const x2 = z.i1 != null ? xOf(z.i1) : paneW;
+      const x1 = xAt(z.i0);
+      const x2 = z.i1 != null ? xAt(z.i1) : paneW;
       const y1 = yOf(z.top), y2 = yOf(z.bottom);
       if (y1 == null || y2 == null) continue;
       ctx.fillStyle = z.fill;
@@ -1114,8 +1164,8 @@ class ChartView {
     for (const ln of d.hlines || []) {
       const y = yOf(ln.price);
       if (y == null) continue;
-      const x1 = ln.i0 != null ? xOf(ln.i0) : 0;
-      const x2 = ln.i1 != null ? xOf(ln.i1) : paneW;
+      const x1 = ln.i0 != null ? xAt(ln.i0) : 0;
+      const x2 = ln.i1 != null ? xAt(ln.i1) : paneW;
       ctx.strokeStyle = ln.color;
       ctx.lineWidth = ln.width || 1;
       ctx.setLineDash(ln.dash || []);
@@ -1132,7 +1182,7 @@ class ChartView {
 
     // линии структуры (BOS/ЧоЧ): от пивота до свечи пробоя
     for (const s of d.slines || []) {
-      const x1 = xOf(s.i0), x2 = xOf(s.i1);
+      const x1 = xAt(s.i0), x2 = xAt(s.i1);
       const y = yOf(s.price);
       if (y == null) continue;
       ctx.strokeStyle = s.color;
@@ -2316,6 +2366,25 @@ function selectSymbol(sym) {
   refreshCharts(true);
 }
 
+/* Живая цена: раз в 2 секунды тянем только последние свечи и дописываем их в
+   график. Разметку и метрики не трогаем — они пересчитываются раз в 25 секунд. */
+async function liveTick() {
+  if (!state.symbol || state.busy || state.liveBusy) return;
+  const mode = state.mode, sym = state.symbol;
+  const cv = charts[(CHART_SLOTS[mode] || [])[0]];
+  if (!cv || !cv.candles || !cv.el.clientWidth || document.hidden) return;
+  state.liveBusy = true;
+  try {
+    // мимо кэша свечей: он отдаёт данные 25-секундной давности
+    const cs = await API.klines(sym, TF_CFG[mode].interval, 3);
+    if (state.symbol === sym && state.mode === mode) cv.pushLast(cs);
+  } catch (e) {
+    /* сеть моргнула — следующий тик через 2 секунды */
+  } finally {
+    state.liveBusy = false;
+  }
+}
+
 async function refreshCharts(fit = false) {
   if (!state.symbol) return;
   if (state.busy) { state.queued = state.queued || fit; return; }
@@ -2438,6 +2507,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // страховка: вёрстка устоялась — проверяем масштаб графика и чиним, если залип
   setTimeout(() => refreshCharts(true), 900);
   setInterval(() => refreshCharts(false), 25000);
+  setInterval(liveTick, 2000);
   setInterval(loadRanking, 90000);
 });
 
