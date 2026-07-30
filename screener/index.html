@@ -572,6 +572,9 @@ footer {
     <section id="viewH4" class="charts" hidden>
       <div class="chartWrap"><div class="chart" id="chartTfH4"></div></div>
     </section>
+    <section id="viewH1" class="charts" hidden>
+      <div class="chartWrap"><div class="chart" id="chartTfH1"></div></div>
+    </section>
     <section id="viewM15" class="charts">
       <div class="chartWrap"><div class="chart" id="chartTf15"></div></div>
     </section>
@@ -641,6 +644,7 @@ const API = {
 const Metrics = (() => {
   const cache = new Map(); // sym -> {ts, data}
   const TTL = 60000;
+  const MAX = 60;          // чтобы карта не росла бесконечно за длинную сессию
 
   // стена = уровень, где лимиток в разы больше среднего по стакану (в пределах ±5% от цены)
   function findWalls(ob) {
@@ -678,7 +682,9 @@ const Metrics = (() => {
     if (ob.status === 'fulfilled' && ob.value && ob.value.b?.length && ob.value.a?.length) {
       data.walls = findWalls(ob.value);
     }
+    cache.delete(sym);
     cache.set(sym, { ts: Date.now(), data });
+    while (cache.size > MAX) cache.delete(cache.keys().next().value);
     return data;
   }
 
@@ -954,6 +960,13 @@ class ChartView {
       upColor: '#26a69a', downColor: '#ef5350',
       wickUpColor: '#26a69a', wickDownColor: '#ef5350',
       borderVisible: false,
+      // на дневках монет, которые сильно росли, автомасштаб уводил шкалу в минус —
+      // отрицательных цен не бывает, прижимаем нижнюю границу к нулю
+      autoscaleInfoProvider: orig => {
+        const r = orig();
+        if (r && r.priceRange && r.priceRange.minValue < 0) r.priceRange.minValue = 0;
+        return r;
+      },
     });
     this.canvas = document.createElement('canvas');
     Object.assign(this.canvas.style, { position: 'absolute', left: 0, top: 0, pointerEvents: 'none', zIndex: 3 });
@@ -994,7 +1007,8 @@ class ChartView {
     // вертикальный пан шкалы цены и автоскейл НЕ дают событий — следим сами:
     // каждый кадр сверяем маппинг цена→пиксель и перерисовываем при сдвиге
     const watch = () => {
-      if (this.candles && this.candles.length) {
+      // на скрытой вкладке сверять нечего — шесть таймфреймов иначе жгут батарею телефона
+      if (this.candles && this.candles.length && this.el.clientWidth) {
         const ref = this.candles[this.candles.length - 1].c;
         const y = this.series.priceToCoordinate(ref);
         const lr = this.chart.timeScale().getVisibleLogicalRange();
@@ -1202,7 +1216,16 @@ class ChartView {
       }
     }
 
-    // горизонтальные уровни (ликвидность, EQ)
+    // горизонтальные уровни (ликвидность, EQ, стены стакана).
+    // Подписи все прижаты к правому краю и на близких ценах налезали друг на друга —
+    // держим занятые строки и сдвигаем следующую подпись вниз.
+    const usedRows = [];
+    const freeRow = y => {
+      let ry = y - 4;
+      for (let guard = 0; guard < 12 && usedRows.some(u => Math.abs(u - ry) < 11); guard++) ry += 12;
+      usedRows.push(ry);
+      return ry;
+    };
     for (const ln of d.hlines || []) {
       const y = yOf(ln.price);
       if (y == null) continue;
@@ -1218,7 +1241,7 @@ class ChartView {
       if (ln.label) {
         ctx.fillStyle = ln.color;
         const tw = ctx.measureText(ln.label).width;
-        ctx.fillText(ln.label, Math.min(x2 - tw - 4, paneW - tw - 4), y - 4);
+        ctx.fillText(ln.label, Math.min(x2 - tw - 4, paneW - tw - 4), freeRow(y));
       }
     }
 
@@ -1406,7 +1429,7 @@ class DrawTools {
 
   /* ---------- горячие клавиши (раскладка TradingView) ---------- */
   _hotkey(e) {
-    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
     if (!this.cv.el.offsetParent) return;  // только видимая вкладка
 
     const code = e.code;  // раскладка-независимо: KeyT работает и на русской
@@ -1948,7 +1971,8 @@ class DrawTools {
 
 </script>
 <script>
-/* SMC-скринер: рейтинг волатильных монет + авторазметка + сетка сетапов (слом структуры / пробой) */
+/* SMC-скринер: рейтинг волатильных монет Bybit + авторазметка Smart Money на шести
+   таймфреймах (1M / 5M / 15M / 1H / 4H / 1D), поиск и избранное, инструменты рисования. */
 const $ = s => document.querySelector(s);
 
 const state = {
@@ -1960,15 +1984,27 @@ const state = {
   minTurnover: 30e6,
   busy: false,
   queued: false,
-  formations: [],
   search: '',
 };
 
+/* Хранилище может быть запрещено (приватный режим, WebView) или содержать мусор.
+   Без этих обёрток одно битое значение валило весь скрипт — экран оставался пустым. */
+function lsGet(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw == null) return fallback;
+    const v = JSON.parse(raw);
+    return v == null ? fallback : v;
+  } catch (e) { return fallback; }
+}
+function lsSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
 /* ---------- избранное (закреплённые монеты) ---------- */
 const FAVS_KEY = 'smc_favs';
-let FAVS = [];
-try { FAVS = JSON.parse(localStorage.getItem(FAVS_KEY) || '[]'); } catch (e) { FAVS = []; }
-function saveFavs() { localStorage.setItem(FAVS_KEY, JSON.stringify(FAVS)); }
+let FAVS = Array.isArray(lsGet(FAVS_KEY, [])) ? lsGet(FAVS_KEY, []) : [];
+function saveFavs() { lsSet(FAVS_KEY, FAVS); }
 function isFav(sym) { return FAVS.includes(sym); }
 function toggleFav(sym) {
   const i = FAVS.indexOf(sym);
@@ -1983,7 +2019,7 @@ const charts = {};
    контейнере (ширина 0), lightweight-charts схлопывает barSpacing в минимум и
    больше не восстанавливает — свечи «уезжают» вправо, а слева пустота. */
 const CHART_SLOTS = {
-  d1: ['tfD1', '#chartTfD1'], h4: ['tfH4', '#chartTfH4'],
+  d1: ['tfD1', '#chartTfD1'], h4: ['tfH4', '#chartTfH4'], h1: ['tfH1', '#chartTfH1'],
   m15: ['tf15', '#chartTf15'], m5: ['tf5', '#chartTf5'], m1: ['tf1', '#chartTf1'],
 };
 function ensureChart(mode) {
@@ -2013,6 +2049,7 @@ function ensureChart(mode) {
 const VIEWS = {
   d1: '#viewD1',
   h4: '#viewH4',
+  h1: '#viewH1',
   m15: '#viewM15',
   m5: '#viewM5',
   m1: '#viewM1',
@@ -2027,13 +2064,10 @@ const LAYER_DEFS = [
 ];
 const LAYERS = Object.assign(
   Object.fromEntries(LAYER_DEFS.map(([k]) => [k, true])),
-  JSON.parse(localStorage.getItem('smc_layers') || '{}'),
+  lsGet('smc_layers', {}),
 );
-function saveLayers() { localStorage.setItem('smc_layers', JSON.stringify(LAYERS)); }
+function saveLayers() { lsSet('smc_layers', LAYERS); }
 
-// limit 1000 — максимум, который отдаёт Bybit за запрос: 15M ≈ 10 дней истории,
-// 5M ≈ 3.5 дня, 1M ≈ 16 часов. На экране показываем последние ~140 баров,
-// остальное доступно прокруткой влево.
 /* limit 1000 — максимум Bybit за запрос: 1M ≈ 16 ч истории, 15M ≈ 10 дней, 4H ≈ 5 месяцев,
    1D — всё, что есть у монеты. bands (премиум/дисконт) рисуем на старших ТФ, extremes
    (хай/лой окна) — на младших, где нужна ближняя цель. */
@@ -2041,10 +2075,11 @@ const TF_CFG = {
   m1: { interval: '1', minPerBar: 1, label: '1M', limit: 1000, bands: false, extremes: true, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
   m5: { interval: '5', minPerBar: 5, label: '5M', limit: 1000, bands: false, extremes: true, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 200 } },
   m15: { interval: '15', minPerBar: 15, label: '15M', limit: 1000, bands: true, extremes: false, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
+  h1: { interval: '60', minPerBar: 60, label: '1H', limit: 1000, bands: true, extremes: false, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
   h4: { interval: '240', minPerBar: 240, label: '4H', limit: 1000, bands: true, extremes: false, opts: { sweepLb: 120, knifeLb: 120, consolWin: 30, rangeLb: 160 } },
   d1: { interval: 'D', minPerBar: 1440, label: '1D', limit: 1000, bands: true, extremes: false, opts: { sweepLb: 90, knifeLb: 90, consolWin: 20, rangeLb: 120 } },
 };
-const TF_ORDER = ['m1', 'm5', 'm15', 'h4', 'd1'];  // порядок в выпадашке, от младшего к старшему
+const TF_ORDER = ['m1', 'm5', 'm15', 'h1', 'h4', 'd1'];  // порядок в выпадашке, от младшего к старшему
 
 /* ---------- форматирование ---------- */
 const fmtUsd = v => v >= 1e9 ? '$' + (v / 1e9).toFixed(1) + 'B'
@@ -2059,12 +2094,15 @@ const fmtPrice = (v) => {
 
 /* ---------- кэш свечей ---------- */
 const klineCache = new Map();
+const KLINE_CACHE_MAX = 40;  // ~40 рядов по 1000 свечей: дальше выкидываем самые старые
 async function klines(sym, interval, limit) {
   const key = `${sym}:${interval}`;
   const hit = klineCache.get(key);
   if (hit && Date.now() - hit.ts < 25000 && hit.data.length >= limit * 0.9) return hit.data;
   const data = await API.klines(sym, interval, limit);
+  klineCache.delete(key);          // переставляем в конец: Map помнит порядок вставки
   klineCache.set(key, { ts: Date.now(), data });
+  while (klineCache.size > KLINE_CACHE_MAX) klineCache.delete(klineCache.keys().next().value);
   return data;
 }
 
@@ -2217,15 +2255,20 @@ function agoText(mins) {
   if (mins < 2880) return `${(mins / 60).toFixed(mins < 600 ? 1 : 0)} ч`;
   return `${Math.round(mins / 1440)} дн`;
 }
+// «0 мин назад» на 4H читалось странно — событие на незакрытой свече называем прямо
+const agoPhrase = mins => mins <= 0 ? 'на текущей свече' : agoText(mins) + ' назад';
 
 function tfSummary(cs, A, label, minPerBar, m) {
   const price = cs[cs.length - 1].c;
   const last = cs.length - 1;
   const items = [];
   items.push(`<b>${label} структура:</b> ${trendWord(A)}`);
-  if (A.range) {
+  if (A.range && A.range.high > A.range.low) {
+    // цена может уйти ЗА диапазон — раньше в этом случае печатался отрицательный процент
     const pct = Math.round((price - A.range.low) / (A.range.high - A.range.low) * 100);
-    items.push(`<b>в диапазоне:</b> ${pct}% — ${pct >= 50 ? 'премиум' : 'дисконт'}`);
+    if (pct < 0) items.push('<b>диапазон:</b> цена ниже — лой пробит');
+    else if (pct > 100) items.push('<b>диапазон:</b> цена выше — хай пробит');
+    else items.push(`<b>в диапазоне:</b> ${pct}% — ${pct >= 50 ? 'премиум' : 'дисконт'}`);
   }
   if (A.consol) items.push('<b>сжатие:</b> да — жди пробой');
   const lq = nearestLiquidity(A, price);
@@ -2235,190 +2278,11 @@ function tfSummary(cs, A, label, minPerBar, m) {
   const fresh = Math.max(3, Math.round(45 / minPerBar));
   const sw = A.sweeps[A.sweeps.length - 1];
   if (sw && last - sw.i <= fresh) {
-    items.push(`<b>снятие (SFP):</b> ${agoText((last - sw.i) * minPerBar)} назад, ${sw.dir === 1 ? 'лой снят → смотрим лонг' : 'хай снят → смотрим шорт'}`);
+    items.push(`<b>снятие (SFP):</b> ${agoPhrase((last - sw.i) * minPerBar)}, ${sw.dir === 1 ? 'лой снят → смотрим лонг' : 'хай снят → смотрим шорт'}`);
   }
   const kn = A.knives[A.knives.length - 1];
-  if (kn && last - kn.i <= fresh) items.push(`<b>нож:</b> ${agoText((last - kn.i) * minPerBar)} назад (${kn.dir === -1 ? 'вниз' : 'вверх'})`);
+  if (kn && last - kn.i <= fresh) items.push(`<b>нож:</b> ${agoPhrase((last - kn.i) * minPerBar)} (${kn.dir === -1 ? 'вниз' : 'вверх'})`);
   return items.concat(metricItems(m));
-}
-
-/* ---------- формации: слом структуры и пробой сжатия ---------- */
-function detectFormations(sym, tfKey, cs, A) {
-  const res = [];
-  const last = cs.length - 1;
-  if (last < 60) return res;
-  const price = cs[last].c;
-  const atr = A.atr[last] || 0;
-  if (!atr) return res;
-  const mpb = TF_CFG[tfKey].minPerBar;
-
-  // оконные экстремумы — дальняя цель
-  const from = Math.max(0, cs.length - 200);
-  let hi = -Infinity, lo = Infinity;
-  for (let i = from; i <= last; i++) { hi = Math.max(hi, cs[i].h); lo = Math.min(lo, cs[i].l); }
-
-  // СЛОМ СТРУКТУРЫ: свежий ЧоЧ, вход — ретест уровня слома
-  const ev = [...A.events].reverse().find(e => e.type === 'CHOCH' && last - e.at <= 20);
-  if (ev) {
-    const dir = ev.dir;
-    let ext = dir === 1 ? Infinity : -Infinity;
-    for (let i = Math.max(0, ev.from - 3); i <= Math.min(last, ev.at); i++) {
-      ext = dir === 1 ? Math.min(ext, cs[i].l) : Math.max(ext, cs[i].h);
-    }
-    const stop = dir === 1 ? ext - 0.3 * atr : ext + 0.3 * atr;
-    const entry = ev.level;
-    const risk = Math.abs(entry - stop);
-    const lq = A.levels
-      .filter(l => !l.swept && (dir === 1 ? (l.kind === 'EQH' && l.price > price) : (l.kind === 'EQL' && l.price < price)))
-      .sort((a, b) => dir === 1 ? a.price - b.price : b.price - a.price);
-    const tp1 = lq[0] ? lq[0].price : entry + (dir === 1 ? 2 : -2) * risk;
-    const tp1src = lq[0] ? `ликвидность EQ${dir === 1 ? 'H' : 'L'}×${lq[0].count}` : 'расчёт 2R';
-    const tp2 = lq[1] ? lq[1].price : (dir === 1 ? hi : lo);
-    const tp2src = lq[1] ? `ликвидность EQ${dir === 1 ? 'H' : 'L'}×${lq[1].count}` : (dir === 1 ? 'хай окна' : 'лой окна');
-    const rr1 = risk > 0 ? Math.abs(tp1 - entry) / risk : 0;
-    if (risk > 0 && rr1 >= 0.8 && (dir === 1 ? tp1 > entry : tp1 < entry)) {
-      res.push({
-        key: `${sym}|${tfKey}|choch`, kind: 'choch', sym, tfKey, dir,
-        entry, stop, tp1, tp1src, tp2, tp2src, rr1,
-        agoMin: (last - ev.at) * mpb, ev,
-        prio: (last - ev.at) <= 8 ? 0 : 1,
-        cs, A,
-      });
-    }
-  }
-
-  // ПРОБОЙ: сжатие у ликвидности — торгуется выход из бокса
-  if (A.consol) {
-    const box = A.consol;
-    const h = box.top - box.bottom;
-    const up = A.levels.filter(l => !l.swept && l.kind === 'EQH' && l.price > box.top).sort((a, b) => a.price - b.price)[0];
-    const dn = A.levels.filter(l => !l.swept && l.kind === 'EQL' && l.price < box.bottom).sort((a, b) => b.price - a.price)[0];
-    res.push({
-      key: `${sym}|${tfKey}|break`, kind: 'break', sym, tfKey, box,
-      tpUp: up ? up.price : box.top + 2 * h,
-      tpUpSrc: up ? `EQH×${up.count}` : 'бокс ×2',
-      tpDn: dn ? dn.price : box.bottom - 2 * h,
-      tpDnSrc: dn ? `EQL×${dn.count}` : 'бокс ×2',
-      prio: 0.5,
-      cs, A,
-    });
-  }
-  return res;
-}
-
-async function scanFormations() {
-  const out = [];
-  for (const r of state.top) {
-    try {
-      const [c15, c5] = await Promise.all([klines(r.sym, '15', 300), klines(r.sym, '5', 300)]);
-      for (const [tfKey, cs] of [['m15', c15], ['m5', c5]]) {
-        const A = SMC.analyze(cs, TF_CFG[tfKey].opts);
-        for (const f of detectFormations(r.sym, tfKey, cs, A)) {
-          f.coinRank = state.top.indexOf(r);
-          out.push(f);
-        }
-      }
-    } catch (e) { /* монета пропускается */ }
-  }
-  out.sort((a, b) => a.prio - b.prio || a.coinRank - b.coinRank);
-  state.formations = out.slice(0, 8);
-}
-
-/* ---------- сетка карточек формаций ---------- */
-const formPool = new Map(); // key -> {el, cv}
-
-function formationHead(f) {
-  if (f.kind === 'choch') {
-    const d = f.dir === 1 ? '↑' : '↓';
-    return `<span class="fbadge ${f.dir === 1 ? 'long' : 'short'}">СЛОМ ${d}</span>
-      <b>${f.sym.replace('USDT', '')}</b><span class="sc-tf">${TF_CFG[f.tfKey].label}</span>
-      <span class="fago">${f.agoMin} мин назад</span>
-      <span class="fopen">развернуть ↗</span>`;
-  }
-  return `<span class="fbadge break">ПРОБОЙ</span>
-    <b>${f.sym.replace('USDT', '')}</b><span class="sc-tf">${TF_CFG[f.tfKey].label}</span>
-    <span class="fago">сжатие сейчас</span>
-    <span class="fopen">развернуть ↗</span>`;
-}
-
-function formationFoot(f) {
-  if (f.kind === 'choch') {
-    return `<span>вход (ретест): <b>${fmtPrice(f.entry)}</b></span>
-      <span class="stop">стоп: ${fmtPrice(f.stop)}</span>
-      <span class="tp">цель 1: ${fmtPrice(f.tp1)} <i>(${f.tp1src})</i></span>
-      <span class="tp">цель 2: ${fmtPrice(f.tp2)} <i>(${f.tp2src})</i></span>
-      <span>R:R 1:${f.rr1.toFixed(1)}</span>`;
-  }
-  return `<span>бокс: <b>${fmtPrice(f.box.bottom)}–${fmtPrice(f.box.top)}</b></span>
-    <span class="tp">↑ цель: ${fmtPrice(f.tpUp)} <i>(${f.tpUpSrc})</i></span>
-    <span class="tp">↓ цель: ${fmtPrice(f.tpDn)} <i>(${f.tpDnSrc})</i></span>
-    <span class="stop">стоп — за другой стороной бокса</span>`;
-}
-
-function formationDrawings(f) {
-  const zones = [], hlines = [], slines = [];
-  if (f.kind === 'choch') {
-    slines.push({ i0: f.ev.from, i1: f.ev.at, price: f.ev.level, color: '#f0883e', dir: f.ev.dir, label: 'ЧоЧ' });
-    hlines.push({ price: f.entry, color: '#58a6ff', width: 1.5, label: 'ВХОД ' + fmtPrice(f.entry) });
-    hlines.push({ price: f.stop, color: '#f85149', width: 1.5, label: 'СТОП ' + fmtPrice(f.stop) });
-    hlines.push({ price: f.tp1, color: '#3fb950', dash: [6, 4], width: 1.5, label: 'ЦЕЛЬ 1' });
-    hlines.push({ price: f.tp2, color: '#3fb950', dash: [2, 3], label: 'ЦЕЛЬ 2' });
-  } else {
-    zones.push({
-      i0: f.box.i0, i1: null, top: f.box.top, bottom: f.box.bottom,
-      fill: 'rgba(88,166,255,0.10)', stroke: '#58a6ff', dash: [5, 3], label: 'сжатие',
-    });
-    hlines.push({ price: f.tpUp, color: '#3fb950', dash: [6, 4], width: 1.5, label: '↑ ЦЕЛЬ ' + fmtPrice(f.tpUp) });
-    hlines.push({ price: f.tpDn, color: '#3fb950', dash: [6, 4], width: 1.5, label: '↓ ЦЕЛЬ ' + fmtPrice(f.tpDn) });
-  }
-  // ликвидность для контекста
-  const last = f.cs.length - 1;
-  for (const lv of f.A.levels) {
-    if (lv.swept) continue;
-    hlines.push({ price: lv.price, i0: lv.i0, color: '#e3b341', dash: [6, 4], label: `$$$ ${lv.kind}×${lv.count}` });
-  }
-  return { zones, hlines, slines, bands: [] };
-}
-
-function renderFormations() {
-  const grid = $('#setupGrid');
-  const keys = new Set(state.formations.map(f => f.key));
-  for (const [k, o] of [...formPool]) {
-    if (!keys.has(k)) { o.el.remove(); formPool.delete(k); }
-  }
-  let empty = grid.querySelector('.sc-empty');
-  if (!state.formations.length) {
-    if (!empty) {
-      empty = document.createElement('div');
-      empty.className = 'sc-empty';
-      empty.textContent = 'Формаций сейчас нет: ни свежих сломов структуры, ни сжатий на топ-монетах. Это нормально — жди, скан обновляется сам.';
-      grid.appendChild(empty);
-    }
-    return;
-  }
-  if (empty) empty.remove();
-
-  for (const f of state.formations) {
-    let o = formPool.get(f.key);
-    if (!o) {
-      const el = document.createElement('div');
-      el.className = 'fcard';
-      el.dataset.key = f.key;
-      el.innerHTML = '<div class="fhead"></div><div class="fchart"></div><div class="ffoot"></div>';
-      grid.appendChild(el);
-      o = { el, cv: new ChartView(el.querySelector('.fchart')) };
-      formPool.set(f.key, o);
-    }
-    grid.appendChild(o.el); // порядок = ранг
-    o.el.querySelector('.fhead').innerHTML = formationHead(f);
-    o.el.querySelector('.ffoot').innerHTML = formationFoot(f);
-    const price = f.cs[f.cs.length - 1].c;
-    o.cv.setPrecision(price);
-    o.cv.setTitle('');
-    o.cv.setData(f.cs.slice(-160), { fit: true });
-    o.cv.setDrawings(formationDrawings(f));
-    o.cv.setMarkers([]);
-  }
 }
 
 /* ---------- рейтинг ---------- */
@@ -2497,7 +2361,10 @@ function renderSidebar() {
   const el = $('#sidebar');
   const rows = sidebarRows();
   if (!rows.length) {
-    el.innerHTML = `<div class="sb-empty">${state.search ? 'Ничего не найдено' : 'Загрузка…'}</div>`;
+    const msg = state.search ? 'Ничего не найдено'
+      : state.all.length ? 'Под фильтр оборота никто не подходит — снизь порог'
+      : 'Загрузка…';
+    el.innerHTML = `<div class="sb-empty">${msg}</div>`;
     return;
   }
   el.innerHTML = rows.map((r, idx) => `
@@ -2565,19 +2432,11 @@ async function refreshCharts(fit = false) {
     return true;
   };
   try {
-    if (mode === 'setups') {
-      await scanFormations();
-      if (stale()) return;
-      renderFormations();
-      renderSummary([
-        `<b>формации:</b> свежий слом структуры (ЧоЧ) и сжатие под пробой, по топ-монетам на 15M и 5M`,
-        `<b>найдено:</b> ${state.formations.length}`,
-        `<b>клик по карточке</b> — открыть монету на её таймфрейме`,
-      ]);
-    } else {
+    {
       const cfg = TF_CFG[mode];
       const cs = await klines(sym, cfg.interval, cfg.limit);
       if (stale()) return;
+      if (!cs.length) throw new Error('нет свечей по этой монете на ' + cfg.label);
       const A = SMC.analyze(cs, cfg.opts);
       const price = cs[cs.length - 1].c;
       let m = null;
@@ -2680,7 +2539,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const b = e.target.closest('[data-mode]');
     if (b) setMode(b.dataset.mode);
   });
-  document.addEventListener('click', () => tfMenu(false));
+  // на фазе перехвата: инструменты рисования гасят всплытие, обычный click сюда не дойдёт
+  document.addEventListener('pointerdown', e => {
+    if (!e.target.closest('.tfpick')) tfMenu(false);
+  }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') tfMenu(false); });
   $('#selN').addEventListener('change', e => { state.n = +e.target.value; loadRanking(); });
   $('#selTo').addEventListener('change', e => { state.minTurnover = +e.target.value; loadRanking(); });
