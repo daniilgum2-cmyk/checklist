@@ -195,6 +195,14 @@ body{
 .btn.ghost{background:transparent;color:var(--dim);border:1px solid var(--line)}
 .btn:active:not(:disabled){filter:brightness(.94)}
 
+/* ───────── панель автора ───────── */
+.owner-box{margin-top:18px;padding:12px 14px;border-radius:12px;
+  border:1px dashed var(--line);background:rgba(255,255,255,.02)}
+.owner-t{color:var(--dim);font-size:11.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.4px;margin-bottom:9px}
+.owner-btns{display:flex;gap:8px}
+.btn.small{min-height:38px;padding:9px 12px;font-size:13px;border-radius:10px}
+
 /* ───────── расширенный курс ───────── */
 .lib-cta{border-color:rgba(155,140,255,.4) !important;
   background:linear-gradient(180deg,var(--surface),rgba(155,140,255,.08)) !important}
@@ -1537,6 +1545,7 @@ const MODULE_NOTE = {
   7: 'Последний шаг перед группой: размер позиции, стоп и что делать после серии убытков.',
 };
 const OWNER = 'dgumerov';   // куда присылать скриншот за доступом в группу
+const OWNER_ID = 1646661744;
 
 const Game = {
   packs: [],
@@ -1647,6 +1656,40 @@ const Game = {
   /* ─────────────── финал курса ─────────────── */
 
   courseDone() { return this.packs.every(p => this.moduleDone(p)); },
+
+  /* Панель автора: открыть весь курс не проходя его и сбросить обратно.
+     Это удобство, а не защита - прогресс и так лежит на клиенте, подделать
+     его может кто угодно из консоли. Гейт по id нужен лишь чтобы кнопка не
+     мозолила глаза обычному пользователю. */
+  isOwner() {
+    try {
+      const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (!u) return false;
+      return u.id === OWNER_ID || (u.username || '').toLowerCase() === OWNER;
+    } catch (e) { return false; }
+  },
+
+  async unlockAll() {
+    let xp = 0;
+    for (const p of this.packs) {
+      for (const l of p.levels) {
+        Progress.finishLevel(l.id, 3, 1);
+        xp += 30 + (l.perRun || 3) * 10;
+      }
+    }
+    Progress.state.xp = Math.max(Progress.state.xp, xp);
+    // библиотеку подгружаем: без неё темы не отметить, а автор ждёт «всё открыто»
+    try { await Library.load(); Library.data.themes.forEach(t => Progress.seeLib(t.id)); } catch (e) {}
+    Progress.addXp(0);
+    haptic('ok');
+    this.toHome();
+  },
+
+  resetAll() {
+    Progress.reset();
+    haptic('warning');
+    this.toHome();
+  },
 
   renderFinale() {
     this.stats();                    // XP в шапке иначе отстаёт на бонус за уровень
@@ -1764,6 +1807,22 @@ const Game = {
       box.appendChild(this.modHead(s.n, s.title, 'в работе', 0,
                                    'Уровни этого модуля ещё собираются'));
     }
+
+    if (this.isOwner()) box.appendChild(this.ownerPanel());
+  },
+
+  ownerPanel() {
+    const el = document.createElement('div');
+    el.className = 'owner-box';
+    el.innerHTML = `
+      <div class="owner-t">Панель автора</div>
+      <div class="owner-btns">
+        <button class="btn ghost small" id="btnUnlock">Открыть весь курс</button>
+        <button class="btn ghost small" id="btnResetAll">Сбросить прогресс</button>
+      </div>`;
+    el.querySelector('#btnUnlock').addEventListener('click', () => this.unlockAll());
+    el.querySelector('#btnResetAll').addEventListener('click', () => this.resetAll());
+    return el;
   },
 
   modHead(num, title, count, ratio, note) {
