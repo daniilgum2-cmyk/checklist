@@ -21,7 +21,6 @@
   --good:#26D07C;
   --bad:#FF5B5B;
   --chart:#131722;
-  --glowcol:#5B8CFF;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;height:100%}
@@ -197,14 +196,6 @@ body{
 .btn:active:not(:disabled){filter:brightness(.94)}
 
 /* ───────── анимации и награды ───────── */
-/* Свечение по краю экрана от стрика - серию видно, а не только читаешь */
-#app{position:relative}
-#app.streaking::after{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:30;
-  box-shadow:inset 0 0 calc(18px + var(--glow,0) * 46px) var(--glowcol,#5B8CFF);
-  opacity:calc(.18 + var(--glow,0) * .55);
-  transition:box-shadow .35s ease, opacity .35s ease;
-}
 .future{
   background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 13px;
   animation:tipIn .2s ease-out;
@@ -2399,7 +2390,6 @@ const Game = {
   show(name) {
     this.screen = name;
     for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.dataset.screen === name);
-    if (name !== 'play') $('#app').classList.remove('streaking');
     const LIB_TITLE = { library: 'Расширенный курс', theme: 'Расширенный курс' };
     $('.hdr-title').textContent = LIB_TITLE[name] ||
       ((name === 'home' || name === 'finale') ? 'Тренажёр SMC' : this.shortTitle(this.pack));
@@ -2901,7 +2891,6 @@ const Game = {
     Progress.hit(ok);
     Progress.addXp(ok ? (t.kind === 'multi' ? 25 : (this.hinted ? 5 : 10)) : 0);
     haptic(ok ? 'ok' : 'error');
-    this.glow();
     if (t.kind === 'multi' && this.anim) { this.replay(t, res, ok, score); return; }
     this.reveal(t, res, ok, score);
   },
@@ -2953,15 +2942,6 @@ const Game = {
     const price = ov(z.y0, z.y1, ref.y0, ref.y1);
     const time = ov(z.x0, z.x1, ref.x0, ref.x1);
     return { score: 0.7 * price + 0.3 * time, price, time, ref };
-  },
-
-  /* Серия правильных ответов светится по краю экрана, а не только считается.
-     Только на игровом экране: в меню это свечение висело рамкой и мешало. */
-  glow() {
-    const s = Progress.state.streak;
-    const app = $('#app');
-    app.style.setProperty('--glow', Math.min(1, s / 8).toFixed(2));
-    app.classList.toggle('streaking', s >= 2 && this.screen === 'play');
   },
 
   /* Частицы вместо голого цвета: верно - вспышка, мимо - мягкое рассыпание. */
