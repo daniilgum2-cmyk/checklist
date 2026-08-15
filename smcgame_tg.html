@@ -2399,6 +2399,7 @@ const Game = {
   show(name) {
     this.screen = name;
     for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.dataset.screen === name);
+    if (name !== 'play') $('#app').classList.remove('streaking');
     const LIB_TITLE = { library: 'Расширенный курс', theme: 'Расширенный курс' };
     $('.hdr-title').textContent = LIB_TITLE[name] ||
       ((name === 'home' || name === 'finale') ? 'Тренажёр SMC' : this.shortTitle(this.pack));
@@ -2954,12 +2955,13 @@ const Game = {
     return { score: 0.7 * price + 0.3 * time, price, time, ref };
   },
 
-  /* Серия правильных ответов светится по краю экрана, а не только считается. */
+  /* Серия правильных ответов светится по краю экрана, а не только считается.
+     Только на игровом экране: в меню это свечение висело рамкой и мешало. */
   glow() {
     const s = Progress.state.streak;
     const app = $('#app');
     app.style.setProperty('--glow', Math.min(1, s / 8).toFixed(2));
-    app.classList.toggle('streaking', s >= 2);
+    app.classList.toggle('streaking', s >= 2 && this.screen === 'play');
   },
 
   /* Частицы вместо голого цвета: верно - вспышка, мимо - мягкое рассыпание. */
