@@ -460,6 +460,24 @@ body{
 .bt-f.warn{border-left-color:#F5C451}
 .bt-tag.sel{border-color:var(--accent);background:rgba(91,140,255,.14)}
 
+/* ───────── раскладка бэктеста ─────────
+   У курса панель ответов короткая, и экран честно втискивается в вьюпорт.
+   У тренажёра в панели статистика, направление и семь факторов - она выше
+   экрана, и график схлопывался в ноль. Поэтому здесь экран не фиксируем по
+   высоте, а прокручиваем, а графику даём свою. */
+@media (max-width:759px){
+  .screen.play[data-screen="backtest"].on{
+    height:auto;overflow:visible;flex:0 0 auto;
+  }
+  .screen.play[data-screen="backtest"] .play-chart{flex:0 0 auto}
+  .screen.play[data-screen="backtest"] .chart-wrap{flex:0 0 auto;height:min(42vh,300px)}
+  .screen.play[data-screen="backtest"] .play-side{flex:0 0 auto}
+}
+@media (min-width:760px){
+  /* на десктопе панель уже прокручивается сама, нужен только запас снизу */
+  .screen.play[data-screen="backtest"] .play-side{padding-bottom:18px}
+}
+
 </style>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -3160,7 +3178,12 @@ const Backtest = (() => {
     }
 
     let note = '';
-    if (idOk && outCh === '0' && !Progress.bt().softSeen) {
+    if (learning) {
+      const left = IDEAL_N - (Progress.bt().ideal || 0);
+      note = `<div class="bt-note">Разбор чистых сетапов${left > 0 ? `: осталось ${left}` : ''}. `
+           + 'Здесь показаны только моменты, где факторы сошлись и цена действительно пошла - '
+           + 'чтобы ты увидел, как выглядит собранный вход. Статистика с этих раундов не считается.</div>';
+    } else if (idOk && outCh === '0' && !Progress.bt().softSeen) {
       Progress.btSoftSeen();
       note = '<div class="bt-note">Вот он, главный случай. Сетап ты собрал правильно - это засчитано и осталось в статистике идентификации. '
            + 'А цена пошла в другую сторону, и это не ошибка анализа: так бывает с любым сетапом, даже с идеальным. '
@@ -3172,7 +3195,7 @@ const Backtest = (() => {
     ui.ask.classList.add('hidden');
     ui.go.classList.add('hidden');
     ui.next.classList.remove('hidden');
-    ui.next.textContent = 'Следующий раунд';
+    ui.next.textContent = needBridge() ? 'Дальше - как на рынке' : 'Следующий раунд';
     stats();
   }
 
@@ -3188,6 +3211,14 @@ const Backtest = (() => {
   }
 
   function stats() {
+    // в витрине процентов не показываем: моменты там отобраны, и любая цифра
+    // оттуда была бы приукрашенной
+    if (stage() === 'ideal') {
+      ui.stats.innerHTML =
+        `<div class="bt-stat wide"><i>Разбор чистых сетапов</i><b>${Progress.bt().ideal || 0} из ${IDEAL_N}</b>`
+        + '<span>моменты отобраны - статистика начнётся после</span></div>';
+      return;
+    }
     const s = Progress.btStats();
     const line = (label, v, hint) => v
       ? `<div class="bt-stat"><i>${label}</i><b>${v.pct}%</b><span>по ${v.n} ${v.n % 10 === 1 && v.n % 100 !== 11 ? 'раунду' : 'раундам'}</span></div>`
