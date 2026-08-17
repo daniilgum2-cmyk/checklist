@@ -495,6 +495,13 @@ body{
 .bt-stat.wide{flex:1 1 100%}
 #btHint{margin-top:2px}
 
+/* Шапка раунда: тип сетапа и его смысл одной строкой */
+.bt-kind{
+  background:rgba(91,140,255,.1);border:1px solid rgba(91,140,255,.35);
+  border-radius:10px;padding:8px 11px;font-size:13px;line-height:1.4;color:#cfd6e4;
+}
+.bt-kind b{color:var(--accent)}
+
 </style>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -600,41 +607,25 @@ body{
   <!-- ─────────── бэктест: экран ожиданий ─────────── -->
   <section class="screen" data-screen="btIntro">
     <div class="theory">
-      <h2>Прежде чем начать</h2>
+      <h2>Как это работает</h2>
       <ul>
-        <li>Здесь нет заранее известного ответа. Момент истории случайный, и что было дальше, не знает никто - ни ты, ни экран.</li>
-        <li><b>Ты размечаешь график сам</b>, тремя касаниями: последний слом структуры, ордер-блок, от которого работаешь, и цель, куда цена от него пойдёт.</li>
-        <li>Направление отдельно не спрашивается - оно вытекает из разметки. Отметил медвежий блок над ценой, значит ты в шорт.</li>
-        <li>Из разметки собирается <b>сделка</b>: вход по краю блока, стоп за его тень, цель там, где ты её отметил. Дальше свечи прокручиваются вперёд, и сделка закрывается сама.</li>
-        <li>Три исхода: цель, стоп или <b>не открылась</b> - цена не обязана доходить до твоей зоны, и это тоже нормально.</li>
-        <li>Если собрать сделку не из чего - жми «сетапа нет». Не входить, когда входить не от чего, это навык, а не отказ от задания.</li>
-        <li><b>Главное.</b> Даже собранный сетап срабатывает не всегда. Идеальных вариантов не существует - именно поэтому стоп ставят заранее.</li>
-        <li>Поэтому и оценка раздельная: <b>точность разметки</b> - твой навык, <b>итог в R</b> - рынок. Верная разметка при стопе остаётся верной. С целью в 3R можно быть в плюсе, ошибаясь чаще, чем угадывая.</li>
+        <li>Каждый раунд - <b>готовый рабочий сетап</b> на реальной истории BTC. Твоя задача одна: найти его и разметить руками, тапая прямо по графику.</li>
+        <li>Разметка по шагам: где сняли ликвидность, где ордер-блок, где слом структуры. У каждого типа сетапа свои шаги.</li>
+        <li>Из разметки собирается сделка: вход по краю зоны, стоп за её тень, цель - ближайший пул. Дальше свечи прокручиваются вперёд, и видно, как всё отработало.</li>
+        <li>Ведение сделки как в жизни: первый тейк на 1R закрывает половину и переносит стоп в безубыток, второй - до цели.</li>
+        <li>Семь типов сетапов идут по кругу. Первые разы тип назван в задании, дальше определяешь сам.</li>
+        <li><b>Важно и честно.</b> Примеры здесь подобраны рабочими - специально, чтобы ты запомнил, как выглядит правильный сетап. На реальном рынке отрабатывает не всё: даже там, где сошлись все признаки, бывает стоп. Поэтому стоп ставят заранее, а результат считают по серии сделок, а не по одной.</li>
       </ul>
       <p class="bt-author" id="btAuthor"></p>
     </div>
     <div class="actions"><button id="btnBtStart" class="btn primary">Понятно, поехали</button></div>
   </section>
 
-  <!-- ─────────── бэктест: переход к реальному режиму ─────────── -->
-  <section class="screen" data-screen="btBridge">
-    <div class="theory">
-      <h2>Чистые сетапы закончились</h2>
-      <ul>
-        <li>Все восемь моментов были отобраны специально: сделка там собиралась и цена действительно доходила до цели. Это витрина, чтобы ты запомнил, как выглядит собранный вход.</li>
-        <li><b>На реальном рынке так не бывает.</b> Даже сетап, где всё сошлось, уходит в стоп - и это не ошибка анализа, а свойство рынка.</li>
-        <li>Дальше моменты случайные, без отбора. Часть сделок не откроется вовсе, часть выбьет по стопу. Именно поэтому стоп ставят заранее, а результат считают по серии.</li>
-        <li>С этого места копится статистика: отдельно точность разметки, отдельно итог в R и винрейт. Первое - твой навык, остальное - рынок.</li>
-      </ul>
-    </div>
-    <div class="actions"><button id="btnBtBridge" class="btn primary">Начать реальный режим</button></div>
-  </section>
-
   <!-- ─────────── бэктест: раунд ─────────── -->
   <section class="screen play" data-screen="backtest">
     <div class="play-chart">
       <div class="task-bar">
-        <span class="tag">Бэктест</span>
+        <span class="tag">Сетап</span>
         <span class="dots" id="btDots"></span>
         <span class="caption" id="btCaption"></span>
       </div>
@@ -643,6 +634,7 @@ body{
     <div class="play-side">
       <div id="btStats" class="bt-stats"></div>
       <div id="btAsk">
+        <div class="bt-kind" id="btKind"></div>
         <div class="prompt" id="btPrompt"></div>
         <div class="hint" id="btHint"></div>
         <div class="bt-marked" id="btMarked"></div>
@@ -650,9 +642,8 @@ body{
       <div class="sheet">
         <div id="btFeedback" class="feedback"></div>
         <div class="actions">
-          <button id="btnBtSkip" class="btn ghost">Сетапа нет</button>
           <button id="btnBtGo" class="btn primary" disabled>Дальше</button>
-          <button id="btnBtNext" class="btn primary hidden">Следующий раунд</button>
+          <button id="btnBtNext" class="btn primary hidden">Следующий сетап</button>
         </div>
       </div>
     </div>
@@ -1510,7 +1501,7 @@ const Progress = (() => {
   const BT_KEEP = 50;
   const blank = () => ({ v: 1, rev: 0, xp: 0, streak: 0, streakBest: 0, levels: {}, lib: {},
     bt: { id: '', out: '', rounds: 0, seen: 0, softSeen: 0, ideal: 0, bridge: 0,
-      r: 0, trades: 0, filled: 0, wins: 0, skipOk: 0, skipMiss: 0 } });
+      r: 0, trades: 0, filled: 0, wins: 0, skipOk: 0, skipMiss: 0, types: {} } });
   let S = blank();
   let saveTimer = null;
 
@@ -1589,7 +1580,7 @@ const Progress = (() => {
     bt() {
       if (!S.bt) S.bt = {};
       const d = { id: '', out: '', rounds: 0, seen: 0, softSeen: 0, ideal: 0, bridge: 0,
-        r: 0, trades: 0, filled: 0, wins: 0, skipOk: 0, skipMiss: 0 };
+        r: 0, trades: 0, filled: 0, wins: 0, skipOk: 0, skipMiss: 0, types: {} };
       for (const k of Object.keys(d)) if (S.bt[k] == null) S.bt[k] = d[k];
       return S.bt;
     },
@@ -1598,28 +1589,22 @@ const Progress = (() => {
     /* Две метрики пишутся раздельно и никогда не складываются в одну.
        Верная разметка при стопе - это НЕ ошибка, и в строке id она остаётся
        единицей. Результат сделки живёт отдельно и считается в R. */
-    btTrade(markOk, res) {
+    /* Раунд тренажёра. Точность разметки и результат сделки пишутся
+       РАЗДЕЛЬНО: верная разметка при стопе остаётся верной. types считает,
+       сколько раз показан каждый тип сетапа - по нему тип и подбирается
+       по кругу, и по нему же решается, называть тип в задании или уже нет. */
+    btRound(typeId, markOk, res) {
       const b = this.bt();
+      if (!b.types) b.types = {};
+      b.types[typeId] = (b.types[typeId] || 0) + 1;
       b.id = (b.id + (markOk ? '1' : '0')).slice(-BT_KEEP);
       b.rounds = (b.rounds || 0) + 1;
       if (res && res.kind !== 'nofill') {
         b.trades = (b.trades || 0) + 1;
         b.filled = (b.filled || 0) + 1;
         b.r = +((b.r || 0) + res.r).toFixed(2);
-        // «в плюсе» - и цель, и безубыток после первого тейка: полтора R
-        // из ничего это прибыльная сделка, а не проигранная
         if (res.kind === 'target' || res.kind === 'be') b.wins = (b.wins || 0) + 1;
       }
-      save();
-      return b;
-    },
-    /* Пропуск: верный (сетапа не было) идёт в точность разметки, пропуск
-       живого сетапа - нет. Выбирать входы можно, это не ошибка. */
-    btSkip(right) {
-      const b = this.bt();
-      b.rounds = (b.rounds || 0) + 1;
-      if (right) { b.skipOk = (b.skipOk || 0) + 1; b.id = (b.id + '1').slice(-BT_KEEP); }
-      else b.skipMiss = (b.skipMiss || 0) + 1;
       save();
       return b;
     },
@@ -2775,6 +2760,67 @@ const SMC = {
     return out;
   },
 
+  /* ─────────── брейкер: формация из трёх свингов + закрытие телом ─────────── */
+
+  /* Порт breaker_setups из smc_core.py. Бычий: Low → Lower High → Lower Low со
+     снятием первого лоя, затем импульс ЗАКРЫВАЕТ ТЕЛО выше Lower High, и
+     медвежий блок на его экстремуме становится бычьим брейкером. Медвежий
+     зеркально. Прокол тенью брейкера не создаёт. */
+  breakerSetups(cs, piv, atr, look = 18) {
+    const highs = piv.filter(p => p.type === 'H').sort((a, b) => a.i - b.i);
+    const lows = piv.filter(p => p.type === 'L').sort((a, b) => a.i - b.i);
+    const out = [];
+    const scan = (first, mids, d) => {
+      for (let a = 0; a < first.length - 1; a++) {
+        const p1 = first[a], p2 = first[a + 1];
+        if (d === 1 && p2.price >= p1.price) continue;   // снятия нет
+        if (d === -1 && p2.price <= p1.price) continue;
+        const mid = mids.filter(m => m.i > p1.i && m.i < p2.i);
+        if (!mid.length) continue;
+        let m = mid[0];
+        for (const x of mid) {
+          if (d === 1 ? x.price > m.price : x.price < m.price) m = x;
+        }
+        let j = null;
+        for (let k = m.i; k >= Math.max(m.i - 3, 0); k--) {
+          if (k + 1 >= cs.length) continue;
+          const up = cs[k].c > cs[k].o;
+          if ((d === 1 && up) || (d === -1 && !up)) { j = k; break; }
+        }
+        if (j === null) continue;
+        const level = m.price;
+        let sweepI = null;
+        for (let k = p2.i; k < Math.min(cs.length, p2.i + look); k++) {
+          const reach = d === 1 ? cs[k].h > level : cs[k].l < level;
+          if (reach) { sweepI = k; break; }
+        }
+        if (sweepI === null) continue;
+        let confI = null;
+        for (let k = sweepI; k < Math.min(cs.length, sweepI + 4); k++) {
+          if (d === 1 ? cs[k].c > level : cs[k].c < level) { confI = k; break; }
+        }
+        let zt, zb;
+        if (d === 1) { zt = Math.max(level, cs[j].h); zb = cs[j].l; }
+        else { zt = cs[j].h; zb = Math.min(level, cs[j].l); }
+        if (zt <= zb) continue;
+        out.push({ dir: d, i: j, swingI: m.i, level, top: zt, bottom: zb,
+          sweepI: p2.i, swept: p1.i, breakI: sweepI, confI, valid: confI !== null,
+          size: (zt - zb) / (atr[m.i] || 1e-9) });
+      }
+    };
+    scan(lows, highs, 1);
+    scan(highs, lows, -1);
+    return out;
+  },
+
+  /* Зона OTE - откат 62-79% движения. Порт ote_zone. */
+  oteZone(leg) {
+    const up = leg.dir === 1;
+    const a = up ? leg.high - 0.62 * leg.size : leg.low + 0.62 * leg.size;
+    const b = up ? leg.high - 0.79 * leg.size : leg.low + 0.79 * leg.size;
+    return { top: Math.max(a, b), bottom: Math.min(a, b) };
+  },
+
   /* ─────────────────── ликвидность и диапазон ─────────────────── */
 
   equalLevels(cs, piv, atr, tolMult = 0.25) {
@@ -2839,7 +2885,8 @@ const SMC = {
     const st = this.structure(cs, piv);
     const obs = this.obCandidates(cs, atr, st.events);
     for (const ob of obs) this.obState(cs, ob);
-    return { atr, piv, events: st.events, trend: st.trend, obs,
+    const brs = this.breakerSetups(cs, piv, atr);
+    return { atr, piv, events: st.events, trend: st.trend, obs, brs,
       fvgs: this.fvgAll(cs, atr), eqs: this.equalLevels(cs, piv, atr),
       leg: this.legRange(cs, piv) };
   },
@@ -2849,27 +2896,26 @@ if (typeof module !== 'undefined') module.exports = SMC;
 
 </script>
 <script>
-/* Бэктест-тренажёр (раздел 10 плана).
+/* Бэктест-тренажёр (раздел 10 плана, переработан по правкам Даниила).
 
-   Не тест с вариантами, а разметка руками: игрок сам тапает слом структуры,
-   ордер-блок и цель. Из этой разметки собирается СДЕЛКА - вход по краю блока,
-   стоп за его тень, цель там, где отмечен пул. Дальше свечи прокручиваются
-   вперёд и сделка закрывается сама: не открылась, стоп или тейк.
+   Задача тренажёра - научить НАХОДИТЬ сетап и размечать его руками. Поэтому
+   каждый раунд это заведомо рабочий пример: окно подбирается так, что сетап
+   в нём есть и сделка от него доходила до цели. Случайные моменты истории мы
+   пробовали - на них не отрабатывала почти ни одна сделка, и учиться было
+   нечему («даже я еле как прохожу»).
 
-   Почему так, а не «куда пойдёт цена»: направление отдельной кнопкой - это
-   монетка, и один фактор сетапом не является. Здесь направление ВЫТЕКАЕТ из
-   разметки (отметил медвежий блок над ценой - значит шорт), а результат
-   считается в R, а не в проценте угадываний. При винрейте 45% и цели в 3R
-   человек в плюсе, и он видит это на своей же статистике.
+   Плата за это - хиндсайт: примеры отобраны по тому, что было дальше. Врать
+   об этом нельзя, поэтому на экранах прямо сказано, что на реальном рынке
+   отрабатывает не всё, а разбор каждого раунда это напоминает.
 
-   Оценка раздельная и никогда не смешивается в одну галочку:
-     • точность разметки - реально ли существуют отмеченные элементы;
-     • результат сделки - что сделала цена.
-   Верная разметка при стопе остаётся верной: так бывает с любым сетапом.
+   Каталог сетапов - семь типов, каждый со своей разметкой:
+     снятие ликвидности + ордер-блок + слом      имбаланс после слома
+     брейкер-блок                                блок в дисконте
+     блок + имбаланс от одного импульса          зона OTE
+     митигация блока по тренду
 
-   Раунды режет браузер из непрерывного ряда свечей (data/backtest.json):
-   тренажёр обещан без потолка, а запечённые окна - это ровно тот потолок,
-   сколько напекли.  */
+   Первые раунды каждого типа названы в задании, дальше тип скрывается и
+   ученик определяет его сам.  */
 
 /* Винрейт автора для экрана ожиданий. По плану цифра должна быть РЕАЛЬНОЙ,
    поэтому пока null: выдумывать её нельзя, а без неё экран работает. */
@@ -2878,17 +2924,16 @@ const AUTHOR_WINRATE = null;   // например: '58% по 400 сделкам
 const Backtest = (() => {
   const WIN = 64;          // сколько свечей видно в момент решения
   const FUT = 120;         // горизонт, на котором живёт сделка
-  const SHOW = 46;         // а столько свечей будущего показываем на графике
+  const SHOW = 46;         // столько свечей будущего показываем на графике
   const MIN_SIZE = 0.5;    // планка имбаланса - та же, что в Модуле 3
-  const TGT_SIZE = 0.25;   // а цели хватит быть настоящей: близкий разрыв - тоже цель
-  const NEAR = 4.0;        // блок дальше этого (в ATR) цена вряд ли достанет
-  const IDEAL_N = 8;       // сколько чистых сетапов даём в обучающей серии
+  const TGT_SIZE = 0.25;   // цели хватит быть настоящей: близкий разрыв тоже цель
+  const NEAR = 6.0;        // зона дальше этого (в ATR) цене недосягаема
+  const STOP_BUF = 0.2;    // в ATR за экстремум зоны
+  const MIN_RISK = 1.0;    // в ATR: стоп не может быть уже рыночного шума
+  const NAMED = 3;         // сколько раз тип называем, прежде чем скрыть
   const TOL = 1;           // допуск тапа в свечах
 
-  let DATA = null;
-  let chart = null;
-  let round = null;
-  let ui = {};
+  let DATA = null, chart = null, round = null, ui = {};
 
   /* ─────────────────────── данные ─────────────────────── */
 
@@ -2901,7 +2946,6 @@ const Backtest = (() => {
     return DATA;
   }
 
-  /* Ряд лежит дельтами: close от прошлого close, остальное от своего close. */
   function unpack(run) {
     if (run.O) return;
     const n = run.c.length;
@@ -2924,18 +2968,66 @@ const Backtest = (() => {
     return out;
   }
 
-  /* ────────────────── что есть на графике ────────────────── */
+  /* ─────────────────────── сделка ─────────────────────── */
 
-  /* Блоки, до которых цена реально может дотянуться. Дальний блок - не ошибка
-     разметки, но сделка от него не откроется, и учить на этом нечему. */
-  function entryBlocks(an, price, atr) {
-    return an.obs.filter(o => SMC.obValid(o) && !o.dead && !o.touched && o.disp >= 1.8
-      && o.i >= 4 && Math.abs(SMC.obEntry(o) - price) <= NEAR * atr
-      && (o.dir === -1 ? o.bottom > price : o.top < price));
+  /* Зона входа у всех сетапов описывается одинаково: {top, bottom, dir}.
+     dir = 1 - зона под ценой, работаем в лонг; -1 - над ценой, в шорт. */
+  function zoneEntry(z) { return z.dir === 1 ? z.top : z.bottom; }
+  function zoneFar(z) { return z.dir === 1 ? z.bottom : z.top; }
+
+  function tradeOf(z, target, atr) {
+    const entry = zoneEntry(z);
+    const a = atr || 0;
+    let stop = z.dir === 1 ? zoneFar(z) - STOP_BUF * a : zoneFar(z) + STOP_BUF * a;
+    // тонкая зона даёт стоп уже одной свечи, и его снимает та же свеча,
+    // которая даёт вход: в жизни стоп в таком случае отодвигают
+    const floor = MIN_RISK * a;
+    if (a && Math.abs(stop - entry) < floor) {
+      stop = z.dir === 1 ? entry - floor : entry + floor;
+    }
+    const risk = Math.abs(stop - entry);
+    if (!risk) return null;
+    return { dir: z.dir, entry, stop, target: target.price, risk,
+      rr: Math.abs(target.price - entry) / risk };
   }
 
-  /* Цели: пулы ликвидности и незакрытые разрывы. Каждая цель знает, какими
-     свечами её можно тапнуть - по ним и сверяем ответ. */
+  /* Ведение сделки двумя тейками - как учит видео про брейкер: TP1 на 1R,
+     половина позиции и стоп в безубыток, TP2 - отмеченная цель. С одним
+     тейком модель врала: цель в 4R против стопа в 1R почти всегда даёт стоп. */
+  function resolve(trade, fut) {
+    let fill = -1;
+    for (let k = 0; k < fut.length; k++) {
+      const b = fut[k];
+      if (trade.dir === 1 ? b.l <= trade.entry : b.h >= trade.entry) { fill = k; break; }
+    }
+    if (fill < 0) return { kind: 'nofill', r: 0, bars: fut.length };
+    const tp1 = trade.dir === 1 ? trade.entry + trade.risk : trade.entry - trade.risk;
+    let stop = trade.stop, half = false, tp1Bar = null;
+    for (let k = fill; k < fut.length; k++) {
+      const b = fut[k];
+      const hitStop = trade.dir === 1 ? b.l <= stop : b.h >= stop;
+      const hitGoal = trade.dir === 1 ? b.h >= trade.target : b.l <= trade.target;
+      const hitTp1 = trade.dir === 1 ? b.h >= tp1 : b.l <= tp1;
+      // задело и стоп, и цель в одной свече - считаем стопом: порядок внутри
+      // свечи неизвестен, завышать результат нельзя
+      if (hitStop) {
+        return half ? { kind: 'be', r: 0.5, bars: k - fill + 1, fill, tp1Bar }
+          : { kind: 'stop', r: -1, bars: k - fill + 1, fill };
+      }
+      if (hitGoal) {
+        const r = half ? +(0.5 + 0.5 * trade.rr).toFixed(2) : +trade.rr.toFixed(2);
+        return { kind: 'target', r, bars: k - fill + 1, fill, tp1Bar, half };
+      }
+      if (!half && hitTp1) { half = true; tp1Bar = k - fill + 1; stop = trade.entry; }
+    }
+    const last = fut[fut.length - 1].c;
+    const un = (trade.dir === 1 ? last - trade.entry : trade.entry - last) / trade.risk;
+    return { kind: 'open', r: half ? +(0.5 + 0.5 * un).toFixed(2) : +un.toFixed(2),
+      bars: fut.length - fill, fill, tp1Bar, half };
+  }
+
+  /* ─────────────────────── цели ─────────────────────── */
+
   function targets(an, price) {
     const out = [];
     for (const e of an.eqs) {
@@ -2950,7 +3042,6 @@ const Backtest = (() => {
       if (f.filled || f.size < TGT_SIZE) continue;
       const mid = (f.top + f.bottom) / 2;
       out.push({ kind: 'fvg', dir: mid > price ? 1 : -1,
-        // целью считаем дальний край: разрыв закрывают целиком
         price: mid > price ? f.top : f.bottom,
         hits: [f.i - 1, f.i, f.end], text: 'незакрытый имбаланс',
         ann: { type: 'zone', x0: f.i - 1, x1: WIN - 1, y0: f.bottom, y1: f.top,
@@ -2959,80 +3050,229 @@ const Backtest = (() => {
     return out;
   }
 
-  function breaks(an) {
-    return an.events.filter(e => e.at >= 6 && e.at <= WIN - 2);
+  /* ─────────────────────── каталог сетапов ─────────────────────── */
+
+  const zoneAnn = (z, label, tone) => ({ type: 'zone', x0: z.i, x1: WIN - 1,
+    y0: z.bottom, y1: z.top, label, tone });
+  const bosAnn = e => [
+    { type: 'level', price: e.level, i0: e.from, i1: e.at,
+      label: e.type === 'CHOCH' ? 'CHoCH' : 'BOS', dim: true },
+    { type: 'mark', i: e.at, label: e.type === 'CHOCH' ? 'CHoCH' : 'BOS', dir: e.dir }];
+
+  function liveObs(r) {
+    return r.an.obs.filter(o => SMC.obValid(o) && !o.dead && !o.touched && o.disp >= 1.5
+      && o.i >= 4 && o.i <= WIN - 5
+      && Math.abs(SMC.obEntry(o) - r.price) <= NEAR * r.atr
+      && (o.dir === -1 ? o.bottom > r.price : o.top < r.price));
   }
 
-  /* ────────────────── сделка ────────────────── */
 
-  /* Вход по ближнему краю блока, стоп ЗА тень - ровно как учит Модуль 2.
-     Буфер обязателен: стоп ровно по экстремуму сносит любая свеча, которая
-     прошла блок насквозь, и тогда почти все сделки становятся стопами. */
-  const STOP_BUF = 0.2;    // в ATR за экстремум свинга
-  const MIN_RISK = 1.0;    // в ATR: стоп не может быть уже рыночного шума
-
-  function tradeOf(ob, target, atr) {
-    const entry = SMC.obEntry(ob);
-    const a = atr || 0;
-    let stop = ob.dir === -1 ? SMC.obStop(ob) + STOP_BUF * a : SMC.obStop(ob) - STOP_BUF * a;
-    // Тонкий блок даёт стоп уже одной свечи, и его снимает та же свеча, которая
-    // дала вход. В жизни стоп в таком случае отодвигают: он должен быть шире
-    // обычного колебания, иначе это не стоп, а лотерея.
-    const floor = MIN_RISK * a;
-    if (a && Math.abs(stop - entry) < floor) {
-      stop = ob.dir === -1 ? entry + floor : entry - floor;
-    }
-    const risk = Math.abs(stop - entry);
-    if (!risk) return null;
-    const rr = Math.abs(target.price - entry) / risk;
-    return { dir: ob.dir === -1 ? -1 : 1, entry, stop, target: target.price, risk, rr };
+  /* Слом структуры, который сделал импульс от блока. ob.broke ищет событие в
+     8 свечах после блока, а импульс часто ломает структуру позже - поэтому
+     для сетапов ищем шире, по самому списку событий. */
+  function breakAfter(r, o, look = 16) {
+    return r.an.events.find(e => e.dir === o.dir && e.at > o.i && e.at <= o.i + look) || null;
   }
 
-  /* Прокрутка вперёд. Модель управления сделкой - как в видео про брейкер:
-     один тейк это плохая стратегия, поэтому фиксируем двумя частями.
+  function obZoneOf(o) { return { i: o.i, top: o.top, bottom: o.bottom, dir: o.dir === -1 ? -1 : 1 }; }
 
-       TP1 - 1R, половина позиции, стоп сразу в безубыток;
-       TP2 - отмеченная цель, вторая половина.
+  const SETUPS = [
+    {
+      id: 'sweep_ob',
+      name: 'Снятие ликвидности плюс ордер-блок',
+      about: 'Свеча сняла ликвидность, была поглощена, импульс от неё сломал структуру.',
+      steps: [
+        { key: 'sweep', prompt: 'Тапни экстремум, ликвидность за которым сняли',
+          hint: 'Вершина или впадина, за которую цена потом сходила' },
+        { key: 'ob', prompt: 'Тапни свечу ордер-блока',
+          hint: 'Свеча, которая сняла эту ликвидность и была поглощена следующей' },
+        { key: 'bos', prompt: 'Тапни свечу слома структуры',
+          hint: 'Свеча импульса, которая ЗАКРЫЛАСЬ за предыдущим экстремумом' },
+      ],
+      find(r) {
+        const out = [];
+        for (const o of liveObs(r)) {
+          const bos = breakAfter(r, o);
+          if (!bos || o.sweep === null) continue;
+          out.push({ elems: { sweep: o.sweep, ob: o.i, bos: bos.at },
+            zone: obZoneOf(o),
+            anns: [zoneAnn(obZoneOf(o), 'ордер-блок', 'ob'),
+              { type: 'level', price: o.dir === -1 ? r.cs[o.sweep].h : r.cs[o.sweep].l,
+                i0: o.sweep, i1: o.i, label: 'снятая ликвидность' },
+              { type: 'mark', i: o.i, label: 'снятие', dir: -o.dir },
+              ...bosAnn(bos)] });
+        }
+        return out;
+      },
+    },
+    {
+      id: 'fvg_bos',
+      name: 'Имбаланс после слома структуры',
+      about: 'Импульс сломал структуру и оставил разрыв - цена вернётся его закрыть.',
+      steps: [
+        { key: 'bos', prompt: 'Тапни свечу слома структуры',
+          hint: 'Закрытие за предыдущей вершиной или впадиной' },
+        { key: 'fvg', prompt: 'Тапни среднюю свечу имбаланса, который оставил импульс',
+          hint: 'Тройка свечей, где тени первой и третьей не перекрываются' },
+      ],
+      find(r) {
+        const out = [];
+        for (const e of r.an.events) {
+          if (e.at < 6 || e.at > WIN - 6) continue;
+          for (const f of r.an.fvgs) {
+            if (f.filled || f.size < MIN_SIZE || f.dir !== e.dir) continue;
+            if (f.i < e.at - 1 || f.i > e.at + 4) continue;
+            const z = { i: f.i - 1, top: f.top, bottom: f.bottom, dir: f.dir };
+            if (Math.abs(zoneEntry(z) - r.price) > NEAR * r.atr) continue;
+            if (f.dir === 1 ? f.top >= r.price : f.bottom <= r.price) continue;
+            out.push({ elems: { bos: e.at, fvg: f.i },
+              zone: z,
+              anns: [...bosAnn(e), zoneAnn(z, 'имбаланс', 'fvg')] });
+          }
+        }
+        return out;
+      },
+    },
+    {
+      id: 'breaker',
+      name: 'Брейкер-блок',
+      about: 'Ликвидность сняли, импульс пробил свинг и ЗАКРЫЛСЯ телом за ним.',
+      steps: [
+        { key: 'swing', prompt: 'Тапни свечу свинга, который пробили',
+          hint: 'Средний свинг формации - на нём и стоит брейкер' },
+        { key: 'br', prompt: 'Тапни свечу брейкер-блока',
+          hint: 'Встречная свеча на экстремуме этого свинга' },
+      ],
+      find(r) {
+        const out = [];
+        for (const b of r.an.brs) {
+          if (!b.valid || b.size < 0.8) continue;
+          if (b.i < 4 || b.i > WIN - 8 || b.confI > WIN - 4) continue;
+          const z = { i: b.i, top: b.top, bottom: b.bottom, dir: b.dir };
+          if (Math.abs(zoneEntry(z) - r.price) > NEAR * r.atr) continue;
+          if (b.dir === 1 ? b.top >= r.price : b.bottom <= r.price) continue;
+          out.push({ elems: { swing: b.swingI, br: b.i }, zone: z,
+            anns: [zoneAnn(z, 'брейкер', 'ob'),
+              { type: 'level', price: b.level, i0: b.swingI, i1: WIN - 1, label: 'свинг', dim: true },
+              { type: 'mark', i: b.confI, label: 'закрытие тела', dir: b.dir }] });
+        }
+        return out;
+      },
+    },
+    {
+      id: 'discount',
+      name: 'Ордер-блок в дисконте',
+      about: 'Диапазон размечен, цена в дешёвой половине, и там же лежит блок.',
+      steps: [
+        { key: 'legA', prompt: 'Тапни начало последнего движения',
+          hint: 'Крайняя точка, от которой пошло движение' },
+        { key: 'legB', prompt: 'Тапни конец этого движения',
+          hint: 'Противоположный экстремум - между ними и тянут фибо' },
+        { key: 'ob', prompt: 'Тапни блок в дешёвой половине диапазона',
+          hint: 'Ниже середины для лонга, выше - для шорта' },
+      ],
+      find(r) {
+        const leg = r.an.leg;
+        if (!leg) return [];
+        const out = [];
+        const eq = (leg.high + leg.low) / 2;
+        for (const o of liveObs(r)) {
+          const e = SMC.obEntry(o);
+          const cheap = o.dir === 1 ? e < eq : e > eq;
+          if (!cheap) continue;
+          out.push({ elems: { legA: leg.dir === 1 ? leg.loI : leg.hiI,
+              legB: leg.dir === 1 ? leg.hiI : leg.loI, ob: o.i },
+            zone: obZoneOf(o), fib: leg,
+            anns: [...fibAnns(leg), zoneAnn(obZoneOf(o), 'блок в дисконте', 'ob')] });
+        }
+        return out;
+      },
+    },
+    {
+      id: 'ob_fvg',
+      name: 'Блок плюс имбаланс от одного импульса',
+      about: 'Один импульс оставил и блок, и разрыв - две причины в одной точке.',
+      steps: [
+        { key: 'ob', prompt: 'Тапни свечу ордер-блока',
+          hint: 'Снятие ликвидности плюс поглощение' },
+        { key: 'fvg', prompt: 'Тапни имбаланс, который оставил импульс от этого блока',
+          hint: 'Разрыв стоит сразу за блоком, по ходу импульса' },
+      ],
+      find(r) {
+        const out = [];
+        for (const o of liveObs(r)) {
+          for (const f of r.an.fvgs) {
+            if (f.filled || f.size < MIN_SIZE || f.dir !== o.dir) continue;
+            if (f.i <= o.i || f.i > o.extI + 1) continue;
+            out.push({ elems: { ob: o.i, fvg: f.i }, zone: obZoneOf(o),
+              anns: [zoneAnn(obZoneOf(o), 'ордер-блок', 'ob'),
+                { type: 'zone', x0: f.i - 1, x1: WIN - 1, y0: f.bottom, y1: f.top,
+                  label: 'имбаланс импульса', tone: 'fvg' }] });
+          }
+        }
+        return out;
+      },
+    },
+    {
+      id: 'ote',
+      name: 'Зона OTE 62-79%',
+      about: 'Глубокий откат внутри движения - лучшая цена при том же стопе.',
+      steps: [
+        { key: 'legA', prompt: 'Тапни начало последнего движения', hint: 'Крайняя точка движения' },
+        { key: 'legB', prompt: 'Тапни конец этого движения', hint: 'Противоположный экстремум' },
+        { key: 'ote', prompt: 'Выдели рамкой зону OTE', mode: 'zone',
+          hint: 'Откат на 62-79% от конца движения назад' },
+      ],
+      find(r) {
+        const leg = r.an.leg;
+        if (!leg) return [];
+        const z0 = SMC.oteZone(leg);
+        const z = { i: Math.min(leg.hiI, leg.loI), top: z0.top, bottom: z0.bottom, dir: leg.dir };
+        if (z.top - z.bottom < 0.5 * r.atr) return [];
+        if (Math.abs(zoneEntry(z) - r.price) > NEAR * r.atr) return [];
+        if (leg.dir === 1 ? z.top >= r.price : z.bottom <= r.price) return [];
+        return [{ elems: { legA: leg.dir === 1 ? leg.loI : leg.hiI,
+            legB: leg.dir === 1 ? leg.hiI : leg.loI, ote: z }, zone: z, fib: leg,
+          anns: [...fibAnns(leg), zoneAnn(z, 'OTE 62-79%', 'ref')] }];
+      },
+    },
+    {
+      id: 'mitigation',
+      name: 'Митигация блока по тренду',
+      about: 'Структура сломана в сторону тренда, цена возвращается в неотработанный блок.',
+      steps: [
+        { key: 'bos', prompt: 'Тапни свечу слома структуры по тренду',
+          hint: 'Закрытие за предыдущим экстремумом в сторону тренда' },
+        { key: 'ob', prompt: 'Тапни неотработанный блок, куда цена возвращается',
+          hint: 'Блок в ту же сторону, в который цена ещё не заходила' },
+      ],
+      find(r) {
+        const out = [];
+        if (!r.an.trend) return out;
+        for (const o of liveObs(r)) {
+          if (o.dir !== r.an.trend) continue;
+          const bos = breakAfter(r, o);
+          if (!bos) continue;
+          out.push({ elems: { bos: bos.at, ob: o.i }, zone: obZoneOf(o),
+            anns: [...bosAnn(bos), zoneAnn(obZoneOf(o), 'неотработанный блок', 'ob')] });
+        }
+        return out;
+      },
+    },
+  ];
 
-     Без этого тренажёр врал: цель в 4R против стопа в 1R за 5-6 свечей почти
-     всегда даёт стоп, и на выходе получался винрейт 3%, которого на рынке
-     не бывает. Разбивка тейков - не поддавка, а то, как сделку ведут. */
-  function resolve(trade, fut) {
-    let fill = -1;
-    for (let k = 0; k < fut.length; k++) {
-      const b = fut[k];
-      const touched = trade.dir === -1 ? b.h >= trade.entry : b.l <= trade.entry;
-      if (touched) { fill = k; break; }
-    }
-    if (fill < 0) return { kind: 'nofill', r: 0, bars: fut.length };
-
-    const tp1 = trade.dir === -1 ? trade.entry - trade.risk : trade.entry + trade.risk;
-    let stop = trade.stop, half = false, tp1Bar = null;
-    for (let k = fill; k < fut.length; k++) {
-      const b = fut[k];
-      const hitStop = trade.dir === -1 ? b.h >= stop : b.l <= stop;
-      const hitTp1 = trade.dir === -1 ? b.l <= tp1 : b.h >= tp1;
-      const hitGoal = trade.dir === -1 ? b.l <= trade.target : b.h >= trade.target;
-      // в одной свече задело и стоп, и цель - считаем стопом: порядок внутри
-      // свечи неизвестен, завышать результат нельзя
-      if (hitStop) {
-        return half
-          ? { kind: 'be', r: 0.5, bars: k - fill + 1, fill, tp1Bar }
-          : { kind: 'stop', r: -1, bars: k - fill + 1, fill };
-      }
-      if (hitGoal) {
-        const r = half ? +(0.5 + 0.5 * trade.rr).toFixed(2) : +trade.rr.toFixed(2);
-        return { kind: 'target', r, bars: k - fill + 1, fill, tp1Bar, half };
-      }
-      if (!half && hitTp1) { half = true; tp1Bar = k - fill + 1; stop = trade.entry; }
-    }
-    const last = fut[fut.length - 1].c;
-    const un = (trade.dir === -1 ? trade.entry - last : last - trade.entry) / trade.risk;
-    const r = half ? +(0.5 + 0.5 * un).toFixed(2) : +un.toFixed(2);
-    return { kind: 'open', r, bars: fut.length - fill, fill, tp1Bar, half };
+  function fibAnns(leg) {
+    const i0 = Math.min(leg.hiI, leg.loI);
+    return [
+      { type: 'level', price: leg.high, i0, i1: WIN - 1, label: '100%', dim: true },
+      { type: 'level', price: (leg.high + leg.low) / 2, i0, i1: WIN - 1, label: '50%' },
+      { type: 'level', price: leg.low, i0, i1: WIN - 1, label: '0%', dim: true },
+    ];
   }
 
-  /* ────────────────── раунд ────────────────── */
+  const byId = id => SETUPS.find(s => s.id === id);
+
+  /* ─────────────────────── раунд ─────────────────────── */
 
   function draw(rnd) {
     const tfs = Object.keys(DATA.series);
@@ -3045,81 +3285,74 @@ const Backtest = (() => {
     const cs = slice(run, from, WIN);
     const fut = slice(run, from + WIN, FUT);
     const an = SMC.analyze(cs);
-    const price = cs[WIN - 1].c;
-    const atr = an.atr[an.atr.length - 1] || 1e-9;
-    const bs = breaks(an);
-    if (!bs.length) return null;
-    const obs = entryBlocks(an, price, atr);
-    const tgs = targets(an, price);
-    // сетап есть, если у блока есть цель в его же сторону и хотя бы 1.5R
-    const setups = [];
-    for (const ob of obs) {
+    return { tf: s.tf, step: s.step, t0: run.t0 + from * s.step, cs, fut, an,
+      price: cs[WIN - 1].c, atr: an.atr[an.atr.length - 1] || 1e-9 };
+  }
+
+  /* Раунд годится, только если сетап нужного типа в нём есть И от него была
+     цель, до которой цена реально дошла. Это и есть «каждый сетап отрабатывает». */
+  function tryType(r, setup) {
+    const cands = setup.find(r);
+    if (!cands.length) return null;
+    const tgs = targets(r.an, r.price);
+    const ok = [];
+    for (const c of cands) {
+      const good = [];
       for (const t of tgs) {
-        if (t.dir !== ob.dir) continue;
-        const tr = tradeOf(ob, t, atr);
-        if (tr && tr.rr >= 1.2) setups.push({ ob, target: t, trade: tr });
+        if (t.dir !== c.zone.dir) continue;
+        const tr = tradeOf(c.zone, t, r.atr);
+        if (!tr || tr.rr < 1.2) continue;
+        if (resolve(tr, r.fut).kind === 'target') good.push({ target: t, trade: tr });
+      }
+      if (good.length) {
+        good.sort((a, b) => a.trade.rr - b.trade.rr);
+        ok.push(Object.assign({}, c, { good, setup }));
       }
     }
-    return { tf: s.tf, step: s.step, t0: run.t0 + from * s.step,
-      cs, fut, an, price, atr, breaks: bs, obs, tgs, setups };
+    return ok.length ? ok : null;
   }
 
-  /* Обучающая серия - витрина: сетап собран и он ОТРАБОТАЛ. Осознанный
-     хиндсайт: человек должен сначала увидеть, как выглядит собранный вход.
-     Дальше отбор выключается, и об этом честно предупреждает отдельный экран. */
-  function isIdeal(r) {
-    if (!r.setups.length) return false;
-    const best = r.setups.slice().sort((a, b) => b.trade.rr - a.trade.rr)[0];
-    if (best.trade.rr < 2) return false;
-    return resolve(best.trade, r.fut).kind === 'target';
+  /* Тип берём по кругу - иначе один-два вытеснят остальные. */
+  function pickType() {
+    const b = Progress.bt();
+    const seen = b.types || {};
+    let best = SETUPS[0], min = Infinity;
+    for (const s of SETUPS) {
+      const n = seen[s.id] || 0;
+      if (n < min) { min = n; best = s; }
+    }
+    return best;
   }
 
-  function stage() { return (Progress.bt().ideal || 0) < IDEAL_N ? 'ideal' : 'real'; }
-
-  function newRound(rnd = Math.random, forceStage) {
-    const st = forceStage || stage();
-    if (st === 'ideal') {
-      for (let a = 0; a < 900; a++) {
+  function newRound(rnd = Math.random, forceType) {
+    const first = forceType ? byId(forceType) : pickType();
+    // запасные типы тоже перебираем от самого редкого: иначе первый в списке
+    // становится дежурной подменой и вытесняет остальные
+    const seen = Progress.bt().types || {};
+    const order = [first].concat(SETUPS.filter(s => s !== first)
+      .sort((a, b) => (seen[a.id] || 0) - (seen[b.id] || 0)));
+    for (const setup of order) {
+      for (let a = 0; a < 2200; a++) {
         const r = draw(rnd);
-        if (r && isIdeal(r)) { r.ideal = true; return r; }
+        if (!r) continue;
+        const ok = tryType(r, setup);
+        if (!ok) continue;
+        const c = ok[Math.floor(rnd() * ok.length)];
+        return Object.assign(r, { setup, cand: c, all: ok });
       }
     }
-    // Четверть раундов оставляем БЕЗ сетапа: «пропустить» должно быть живым
-    // ответом, а не отговоркой. Остальные подбираем так, чтобы собрать сделку
-    // было из чего. Это отбор по тому, что видно в момент решения, а не по
-    // будущему - хиндсайта здесь нет.
-    const wantSetup = rnd() > 0.25;
-    let fallback = null;
-    for (let a = 0; a < 200; a++) {
-      const r = draw(rnd);
-      if (!r) continue;
-      if (!fallback) fallback = r;
-      if (wantSetup === (r.setups.length > 0)) return r;
-    }
-    return fallback;
+    return null;
   }
 
-  /* ────────────────── экран ────────────────── */
+  /* ─────────────────────── экран ─────────────────────── */
 
-  const STEPS = [
-    { key: 'bos', prompt: 'Тапни свечу последнего слома структуры',
-      hint: 'Свеча, которая ЗАКРЫЛАСЬ за предыдущей вершиной или впадиной' },
-    { key: 'ob', prompt: 'Тапни свечу ордер-блока, от которого будешь работать',
-      hint: 'Встречная свеча, которая сняла ликвидность и была поглощена следующей' },
-    { key: 'target', prompt: 'Тапни цель - куда цена пойдёт от блока',
-      hint: 'Незакрытый имбаланс или равные хаи и лои по ходу сделки' },
-  ];
-
-  function dataset(r, withFuture) {
+  function dataset(r, showBars) {
     const d = { tf: r.tf, t0: r.t0, step: r.step,
       o: r.cs.map(x => x.o), h: r.cs.map(x => x.h),
       l: r.cs.map(x => x.l), c: r.cs.map(x => x.c) };
-    if (withFuture) {
-      // сделку считаем на всём горизонте, а показываем ровно столько свечей,
-      // чтобы было видно её закрытие: 120 штук на экране превращаются в кашу
-      const need = withFuture === true ? SHOW
-        : Math.min(r.fut.length, Math.max(12, withFuture + 3));
-      const f = r.fut.slice(0, Math.min(r.fut.length, Math.max(SHOW, need)));
+    if (showBars) {
+      const need = showBars === true ? SHOW : Math.max(SHOW, Math.min(r.fut.length, showBars + 3));
+      const f = r.fut.slice(0, Math.min(r.fut.length, need));
       d.fo = f.map(x => x.o); d.fh = f.map(x => x.h);
       d.fl = f.map(x => x.l); d.fc = f.map(x => x.c);
     }
@@ -3128,66 +3361,70 @@ const Backtest = (() => {
 
   function mount(box, refs) {
     ui = refs;
-    if (!chart) chart = new GameChart(box, { onSelect: () => syncGo() });
+    if (!chart) chart = new GameChart(box, { onSelect: () => syncGo(), onZone: () => syncGo() });
   }
 
-  function dispose() {
-    if (chart) { chart.destroy(); chart = null; }
-    round = null;
+  function dispose() { if (chart) { chart.destroy(); chart = null; } round = null; }
+
+  /* Тип называем только первые NAMED раз, дальше ученик определяет сам. */
+  function named(setup) {
+    const seen = (Progress.bt().types || {})[setup.id] || 0;
+    return seen < NAMED;
   }
 
   function next() {
-    round = newRound(Math.random, stage());
+    round = newRound();
     if (!round) return;
     ui.step = 0;
     ui.marks = {};
     chart.setData(dataset(round, false));
-    chart.setMode('tap', 1);
     chart.playIn(700);
-    // дату прячем до разбора: по ней вспоминается, что тогда делал биткоин
     ui.caption.textContent = `BTCUSDT · ${round.tf}`;
     ui.feedback.className = 'feedback';
     ui.feedback.innerHTML = '';
     ui.next.classList.add('hidden');
     ui.go.classList.remove('hidden');
-    ui.skip.classList.remove('hidden');
     ui.ask.classList.remove('hidden');
     renderStep();
     stats();
   }
 
   function renderStep() {
-    const s = STEPS[ui.step];
+    const st = round.setup.steps[ui.step];
     chart.sel = [];
-    chart.setMode('tap', 1);
-    ui.prompt.textContent = s.prompt;
-    ui.hint.textContent = s.hint;
-    ui.dots.innerHTML = STEPS.map((_, k) =>
+    chart.zone = null;
+    chart.setMode(st.mode === 'zone' ? 'zone' : 'tap', 1);
+    const head = named(round.setup)
+      ? `<b>${round.setup.name}.</b> ${round.setup.about}`
+      : '<b>Определи сетап сам.</b> Тип не подсказываем - размечай то, что видишь.';
+    ui.kind.innerHTML = head;
+    ui.prompt.textContent = `Шаг ${ui.step + 1} из ${round.setup.steps.length}. ${st.prompt}`;
+    ui.hint.textContent = st.hint;
+    ui.dots.innerHTML = round.setup.steps.map((_, k) =>
       `<i class="${k < ui.step ? 'past' : k === ui.step ? 'cur' : ''}"></i>`).join('');
-    ui.marked.innerHTML = STEPS.slice(0, ui.step).map(st =>
-      `<span class="bt-chip">${chipText(st.key)}</span>`).join('');
+    ui.marked.innerHTML = round.setup.steps.slice(0, ui.step)
+      .map(s => `<span class="bt-chip">${s.key === 'ote' ? 'зона' : 'отмечено'}: ${s.prompt.split(' ').slice(1, 3).join(' ')}</span>`).join('');
     syncGo();
   }
 
-  function chipText(key) {
-    if (key === 'bos') return 'слом отмечен';
-    if (key === 'ob') return 'блок отмечен';
-    return 'цель отмечена';
-  }
-
   function syncGo() {
-    const has = chart && chart.sel && chart.sel.length === 1;
+    if (!round) return;
+    const st = round.setup.steps[ui.step];
+    const has = st.mode === 'zone' ? !!chart.zone : (chart.sel && chart.sel.length === 1);
     ui.go.disabled = !has;
-    ui.go.textContent = ui.step < STEPS.length - 1 ? 'Дальше' : 'Открыть сделку';
+    ui.go.textContent = ui.step < round.setup.steps.length - 1 ? 'Дальше' : 'Открыть сделку';
   }
 
-  /* Шаг вперёд: запоминаем тап и идём дальше, а проверяем всё в конце - иначе
-     тренажёр превращается в подсказку и хиндсайт возвращается через заднюю
-     дверь. */
   function stepNext() {
-    if (!chart.sel.length) return;
-    ui.marks[STEPS[ui.step].key] = chart.sel[0];
-    if (ui.step < STEPS.length - 1) { ui.step++; renderStep(); return; }
+    const st = round.setup.steps[ui.step];
+    if (st.mode === 'zone') {
+      if (!chart.zone) return;
+      ui.marks[st.key] = Object.assign({}, chart.zone);
+    } else {
+      if (!chart.sel.length) return;
+      ui.marks[st.key] = chart.sel[0];
+    }
+    if (ui.step < round.setup.steps.length - 1) { ui.step++; renderStep(); return; }
     judge();
   }
 
@@ -3197,156 +3434,97 @@ const Backtest = (() => {
     return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${String(d.getUTCFullYear()).slice(2)}`;
   }
 
-  /* ────────────────── проверка ────────────────── */
+  /* ─────────────────────── проверка ─────────────────────── */
 
-  function near(a, b) { return Math.abs(a - b) <= TOL; }
+  const near = (a, b, tol = TOL) => Math.abs(a - b) <= tol;
+
+  function zoneScore(mine, ref) {
+    const ov = (a0, a1, b0, b1) => {
+      const inter = Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+      const uni = Math.max(a1, b1) - Math.min(a0, b0);
+      return uni > 0 ? inter / uni : 0;
+    };
+    return 0.8 * ov(mine.y0, mine.y1, ref.bottom, ref.top)
+      + 0.2 * ov(mine.x0, mine.x1, ref.i, WIN - 1);
+  }
+
+  /* Ищем кандидата, который лучше всего сходится с разметкой ученика: любой
+     сетап того же типа в окне - верный ответ, а не только тот, что выбрал
+     генератор. */
+  function match() {
+    const steps = round.setup.steps;
+    let best = null, bestHits = -1;
+    for (const c of round.all) {
+      let hits = 0;
+      const rows = [];
+      for (const st of steps) {
+        const mine = ui.marks[st.key], ref = c.elems[st.key];
+        let ok;
+        if (st.mode === 'zone') ok = mine && zoneScore(mine, ref) >= 0.5;
+        else ok = mine != null && near(mine, ref, st.key === 'fvg' ? 2 : TOL);
+        if (ok) hits++;
+        rows.push({ st, ok, ref });
+      }
+      if (hits > bestHits) { bestHits = hits; best = { c, rows, hits }; }
+    }
+    return best;
+  }
 
   function judge() {
     const r = round;
-    const learning = !!r.ideal;
-    const mb = ui.marks.bos, mo = ui.marks.ob, mt = ui.marks.target;
+    const m = match();
+    const clean = m.hits === r.setup.steps.length;
+    const c = m.c;
+    // сделку считаем от ЕГО зоны, если разметка сошлась, иначе от эталонной
+    const pick = c.good[0];
+    const trade = pick.trade;
+    const res = resolve(trade, r.fut);
+    Progress.btRound(r.setup.id, clean, clean ? res : null);
 
-    const bos = r.breaks.find(e => near(e.at, mb)) || null;
-    const ob = r.obs.find(o => near(o.i, mo))
-      || r.an.obs.filter(o => SMC.obValid(o)).find(o => near(o.i, mo)) || null;
-    const far = !!ob && !r.obs.includes(ob);
-    const tgt = r.tgs.find(t => t.hits.some(h => near(h, mt))) || null;
-
-    const rows = [];
-    rows.push(bos
-      ? row('good', 'Слом структуры', `${bos.type === 'CHOCH' ? 'CHoCH' : 'BOS'} ${bos.dir === 1 ? 'вверх' : 'вниз'}: свеча закрылась за уровнем`)
-      : row('bad', 'Слом структуры', 'на этой свече закрытия за предыдущим экстремумом нет'));
-    rows.push(ob
-      ? row(far ? 'warn' : 'good', 'Ордер-блок',
-        far ? 'блок настоящий, но он слишком далеко от цены - лимитка вряд ли сработает'
-            : 'ликвидность снята, свеча поглощена, цена в блок ещё не возвращалась')
-      : row('bad', 'Ордер-блок', 'у этой свечи нет снятия ликвидности или поглощения'));
-    rows.push(tgt
-      ? row(ob && tgt.dir !== ob.dir ? 'warn' : 'good', 'Цель',
-        ob && tgt.dir !== ob.dir ? `${tgt.text} - цель настоящая, но она с другой стороны от блока`
-          : `${tgt.text} - цена его ещё не забрала`)
-      : row('bad', 'Цель', 'здесь нет ни незакрытого разрыва, ни неснятого пула'));
-
-    const clean = !!(bos && ob && tgt && !far && tgt.dir === ob.dir);
-    let trade = null, res = null;
-    if (ob && tgt && tgt.dir === ob.dir) trade = tradeOf(ob, tgt, r.atr);
-    if (trade) res = resolve(trade, r.fut);
-
-    // разметка и результат считаются раздельно: верная разметка при стопе
-    // остаётся верной, это свойство рынка, а не ошибка анализа
-    if (learning) Progress.btIdeal(); else Progress.btTrade(clean, res);
-
-    chart.setData(dataset(r, res ? (res.fill || 0) + res.bars : true));
-    chart.setAnnotations(marks(r, bos, ob, tgt, trade));
+    chart.setData(dataset(r, (res.fill || 0) + res.bars));
+    const anns = c.anns.map(a => Object.assign({}, a));
+    anns.push(Object.assign({}, pick.target.ann, { dim: true }));
+    anns.push({ type: 'level', price: trade.stop, i0: c.zone.i, i1: WIN - 1, label: 'стоп' });
+    anns.push({ type: 'level', price: trade.entry, i0: c.zone.i, i1: WIN - 1, label: 'вход', dim: true });
+    chart.setAnnotations(anns);
     chart.locked = true;
     chart.setMode('none');
     chart.playFuture(1900);
     chart.setFuture(chart.futureLen);
     ui.caption.textContent = `BTCUSDT · ${r.tf} · ${dateOf(r.t0)}`;
+
+    const rows = m.rows.map(x => x.ok
+      ? `<div class="bt-f good">✓ ${x.st.prompt.replace(/^Тапни |^Выдели рамкой /, '')}</div>`
+      : `<div class="bt-f bad">✗ ${x.st.prompt.replace(/^Тапни |^Выдели рамкой /, '')}<i>отмечено не там - верное место показано на графике</i></div>`).join('');
 
     const head = clean
-      ? '<div class="bt-row good"><b>Разметка верна.</b> Все три элемента на графике есть и складываются в сделку.</div>'
-      : '<div class="bt-row bad"><b>Разметка не сходится.</b> Ниже - что именно.</div>';
-    let tradeLine;
-    if (trade && res) {
-      const dir = trade.dir === -1 ? 'шорт' : 'лонг';
-      tradeLine = `<div class="bt-row"><b>Сделка:</b> ${dir}, вход ${num(trade.entry)}, стоп ${num(trade.stop)}, цель ${num(trade.target)} - потенциал ${trade.rr.toFixed(1)}R.</div>`;
-      if (res.kind === 'nofill') {
-        tradeLine += `<div class="bt-row soft"><b>Сделка не открылась.</b> За ${FUT} свечей цена до зоны входа не дошла. Лимитка висит зря чаще, чем кажется - в статистику такой раунд не идёт.</div>`;
-      } else if (res.kind === 'target') {
-        tradeLine += `<div class="bt-row good"><b>Цель взята: +${res.r}R.</b> Вход сработал, до цели ${res.bars} ${plural(res.bars)}.</div>`;
-      } else if (res.kind === 'stop') {
-        tradeLine += '<div class="bt-row miss"><b>Стоп: -1R.</b> Цена зашла в блок и пошла дальше против сделки.</div>';
-      } else {
-        tradeLine += `<div class="bt-row soft"><b>Сделка осталась открытой: ${res.r > 0 ? '+' : ''}${res.r}R.</b> За горизонт не дошло ни до стопа, ни до цели.</div>`;
-      }
+      ? `<div class="bt-row good"><b>Сетап найден верно.</b> ${r.setup.name}: все элементы на своих местах.</div>`
+      : `<div class="bt-row bad"><b>Разметка сошлась не полностью: ${m.hits} из ${r.setup.steps.length}.</b> Это был «${r.setup.name}».</div>`;
+    const dir = trade.dir === 1 ? 'лонг' : 'шорт';
+    let tr = `<div class="bt-row"><b>Сделка:</b> ${dir}, вход ${num(trade.entry)}, стоп ${num(trade.stop)}, цель ${num(trade.target)} - ${trade.rr.toFixed(1)}R.</div>`;
+    if (res.kind === 'target') {
+      tr += `<div class="bt-row good"><b>Цель взята: +${res.r}R.</b> Первый тейк на 1R, стоп в безубыток, дальше до цели ${res.bars} ${plural(res.bars)}.</div>`;
+    } else if (res.kind === 'be') {
+      tr += '<div class="bt-row soft"><b>Закрылась в безубыток: +0.5R.</b> Первый тейк успел, вторую половину вернуло к входу.</div>';
+    } else if (res.kind === 'stop') {
+      tr += '<div class="bt-row miss"><b>Стоп: -1R.</b></div>';
+    } else if (res.kind === 'nofill') {
+      tr += '<div class="bt-row soft"><b>Сделка не открылась.</b> Цена до зоны не дошла.</div>';
     } else {
-      tradeLine = '<div class="bt-row soft"><b>Сделка не собралась.</b> Без блока и цели в одну сторону входа нет - считать нечего.</div>';
+      tr += `<div class="bt-row soft"><b>Осталась открытой: ${res.r > 0 ? '+' : ''}${res.r}R.</b></div>`;
     }
-
-    let note = '';
-    if (learning) {
-      const left = IDEAL_N - Progress.bt().ideal;
-      if (left > 0) note = `<div class="bt-note">Разбор чистых сетапов: осталось ${left}. Здесь показаны только моменты, где сделка собиралась и цена действительно доходила до цели.</div>`;
-    } else if (clean && res && res.kind === 'stop' && !Progress.bt().softSeen) {
-      Progress.btSoftSeen();
-      note = '<div class="bt-note">Вот он, главный случай. Разметку ты сделал правильно - она засчитана и осталась в статистике. '
-           + 'А сделка ушла в стоп, и это не ошибка анализа: так бывает с любым сетапом, даже с идеальным. '
-           + 'Именно поэтому стоп ставят заранее, а результат считают по серии: с целью в 3R можно быть в плюсе, ошибаясь чаще, чем угадывая.</div>';
-    }
+    const note = '<div class="bt-note">Этот пример подобран рабочим - здесь сетап отработал, и так ты запоминаешь, как он выглядит. '
+      + 'На реальном рынке отрабатывает не всё: поэтому стоп ставят заранее, а результат считают по серии.</div>';
 
     ui.feedback.className = 'feedback on ' + (clean ? 'good' : 'bad');
-    ui.feedback.innerHTML = head + rows.join('') + tradeLine + note;
-    finishTurn(learning);
-  }
-
-  /* Пропуск - полноправный ответ. Не входить, когда входить не от чего, это
-     навык, а не отказ от задания. */
-  function skip() {
-    const r = round;
-    const learning = !!r.ideal;
-    const had = r.setups.length > 0;
-    if (learning) Progress.btIdeal(); else Progress.btSkip(!had);
-
-    const best = had ? r.setups.slice().sort((a, b) => b.trade.rr - a.trade.rr)[0] : null;
-    const bres = best ? resolve(best.trade, r.fut) : null;
-    chart.setData(dataset(r, bres ? (bres.fill || 0) + bres.bars : true));
-    chart.setAnnotations(best ? marks(r, null, best.ob, best.target, best.trade) : []);
-    chart.locked = true;
-    chart.setMode('none');
-    chart.playFuture(1900);
-    chart.setFuture(chart.futureLen);
-    ui.caption.textContent = `BTCUSDT · ${r.tf} · ${dateOf(r.t0)}`;
-
-    let body;
-    if (!had) {
-      body = '<div class="bt-row good"><b>Пропуск верный.</b> Собрать сделку тут было не из чего: '
-           + 'рядом с ценой нет неотработанного блока либо нет цели в его сторону. Не входить в такой момент - это навык.</div>';
-    } else {
-      const res = bres;
-      const word = res.kind === 'target' ? `дошла до цели на +${res.r}R`
-        : res.kind === 'stop' ? 'ушла в стоп'
-        : res.kind === 'nofill' ? 'даже не открылась' : 'осталась открытой';
-      body = `<div class="bt-row soft"><b>Сетап тут был.</b> Показал его на графике: потенциал ${best.trade.rr.toFixed(1)}R, `
-           + `по факту сделка ${word}. Пропуск не ошибка - выбирать входы можно, - поэтому в статистику раунд не идёт.</div>`;
-    }
-    ui.feedback.className = 'feedback on ' + (had ? 'bad' : 'good');
-    ui.feedback.innerHTML = body;
-    finishTurn(learning);
-  }
-
-  function finishTurn(learning) {
+    ui.feedback.innerHTML = head + rows + tr + note;
     ui.ask.classList.add('hidden');
     ui.go.classList.add('hidden');
-    ui.skip.classList.add('hidden');
     ui.next.classList.remove('hidden');
-    ui.next.textContent = (learning && Progress.bt().ideal >= IDEAL_N)
-      ? 'Дальше - как на рынке' : 'Следующий раунд';
+    ui.next.textContent = 'Следующий сетап';
     stats();
   }
 
-  function marks(r, bos, ob, tgt, trade) {
-    const out = [];
-    if (bos) {
-      out.push({ type: 'level', price: bos.level, i0: bos.from, i1: bos.at,
-        label: bos.type === 'CHOCH' ? 'CHoCH' : 'BOS', dim: true });
-      out.push({ type: 'mark', i: bos.at, label: bos.type === 'CHOCH' ? 'CHoCH' : 'BOS', dir: bos.dir });
-    }
-    if (ob) {
-      out.push({ type: 'zone', x0: ob.i, x1: WIN - 1, y0: ob.bottom, y1: ob.top,
-        label: 'ордер-блок', tone: 'ob' });
-    }
-    if (tgt) out.push(Object.assign({}, tgt.ann));
-    if (trade && ob) {
-      out.push({ type: 'level', price: trade.stop, i0: ob.i, i1: WIN - 1, label: 'стоп' });
-      out.push({ type: 'level', price: trade.entry, i0: ob.i, i1: WIN - 1, label: 'вход', dim: true });
-    }
-    return out;
-  }
-
-  function row(tone, name, why) {
-    return `<div class="bt-f ${tone}">${tone === 'good' ? '✓' : '✗'} ${name}<i>${why}</i></div>`;
-  }
   function num(x) { return Math.round(x).toLocaleString('ru-RU'); }
   function plural(n) {
     const t = n % 100 > 10 && n % 100 < 15 ? 2 : [2, 0, 1, 1, 1, 2][Math.min(5, n % 10)];
@@ -3354,36 +3532,23 @@ const Backtest = (() => {
   }
 
   function stats() {
-    const b = Progress.bt();
-    if (stage() === 'ideal') {
-      ui.stats.innerHTML = '<div class="bt-stat wide"><i>Разбор чистых сетапов</i>'
-        + `<b>${b.ideal || 0} из ${IDEAL_N}</b>`
-        + '<span>моменты отобраны - статистика начнётся после</span></div>';
-      return;
-    }
     const s = Progress.btStats();
     const tile = (label, val, sub) =>
       `<div class="bt-stat"><i>${label}</i><b>${val}</b><span>${sub}</span></div>`;
+    const types = Object.keys(Progress.bt().types || {}).length;
     ui.stats.innerHTML =
       tile('Разметка', s.ident ? s.ident.pct + '%' : '-',
-        s.ident ? `по ${s.ident.n} раундам` : 'пока нет раундов') +
+        s.ident ? `по ${s.ident.n} сетапам` : 'пока нет') +
       tile('Итог', (s.sumR > 0 ? '+' : '') + s.sumR.toFixed(1) + 'R',
-        s.trades ? `${s.trades} сделок` : 'сделок ещё нет') +
-      tile('В плюсе', s.wins != null ? s.wins + '%' : '-',
-        s.filled ? `из ${s.filled} открытых` : 'пока нет');
+        s.trades ? `${s.trades} сделок` : 'сделок нет') +
+      tile('Типов пройдено', `${types} из ${SETUPS.length}`, 'каждый по кругу');
   }
 
   function resize() { if (chart) chart.resize(); }
 
-  function needBridge() {
-    const b = Progress.bt();
-    return (b.ideal || 0) >= IDEAL_N && !b.bridge;
-  }
-
-  return { load, mount, dispose, next, stepNext, skip, stats, resize, needBridge, stage,
+  return { load, mount, dispose, next, stepNext, stats, resize,
     get round() { return round; }, get ui() { return ui; },
-    newRound, resolve, tradeOf, entryBlocks, targets, isIdeal,
-    WIN, FUT, IDEAL_N, STEPS };
+    newRound, resolve, tradeOf, targets, SETUPS, WIN, FUT };
 })();
 
 </script>
@@ -3495,18 +3660,7 @@ const Game = {
     $('#btnWrite').addEventListener('click', () => this.writeOwner());
     $('#btnBtStart').addEventListener('click', () => { Progress.btSeen(); this.showBacktest(); });
     $('#btnBtGo').addEventListener('click', () => { haptic('light'); Backtest.stepNext(); });
-    $('#btnBtSkip').addEventListener('click', () => { haptic('light'); Backtest.skip(); });
-    $('#btnBtNext').addEventListener('click', () => {
-      haptic('light');
-      // обучающая серия кончилась - между режимами обязательно объясняем разницу
-      if (Backtest.needBridge()) { this.show('btBridge'); return; }
-      Backtest.next();
-    });
-    $('#btnBtBridge').addEventListener('click', () => {
-      Progress.btBridge();
-      this.show('backtest');
-      Backtest.next();
-    });
+    $('#btnBtNext').addEventListener('click', () => { haptic('light'); Backtest.next(); });
     $('#btnNextMod').addEventListener('click', () => {
       const next = this.packs[this.packs.indexOf(this.pack) + 1];
       this.pack = next;
@@ -3624,9 +3778,9 @@ const Game = {
     }
     await Backtest.load();
     Backtest.mount($('#btChart'), {
-      caption: $('#btCaption'), prompt: $('#btPrompt'), hint: $('#btHint'),
-      dots: $('#btDots'), marked: $('#btMarked'), feedback: $('#btFeedback'),
-      go: $('#btnBtGo'), next: $('#btnBtNext'), skip: $('#btnBtSkip'),
+      caption: $('#btCaption'), kind: $('#btKind'), prompt: $('#btPrompt'),
+      hint: $('#btHint'), dots: $('#btDots'), marked: $('#btMarked'),
+      feedback: $('#btFeedback'), go: $('#btnBtGo'), next: $('#btnBtNext'),
       ask: $('#btAsk'), stats: $('#btStats'),
     });
     this.show('backtest');
