@@ -3583,6 +3583,10 @@ const BACKTEST_ON = false;
 
 const OWNER = 'dgumerov';   // куда присылать скриншот за доступом в группу
 const OWNER_ID = 1646661744;
+/* Кому показывать панель автора. Это НЕ то же самое, что OWNER: туда идут
+   скриншоты за доступом в группу, и адрес там должен остаться один. */
+const STAFF = ['dgumerov', 'traderw1n'];
+const STAFF_IDS = [OWNER_ID];
 
 const Game = {
   packs: [],
@@ -3710,11 +3714,13 @@ const Game = {
      Это удобство, а не защита - прогресс и так лежит на клиенте, подделать
      его может кто угодно из консоли. Гейт по id нужен лишь чтобы кнопка не
      мозолила глаза обычному пользователю. */
-  isOwner() {
+  isOwner(user) {
     try {
-      const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+      // аргумент нужен для тестов: initDataUnsafe у SDK телеграма только
+      // на чтение, подменить его в браузере нельзя
+      const u = user || (tg && tg.initDataUnsafe && tg.initDataUnsafe.user);
       if (!u) return false;
-      return u.id === OWNER_ID || (u.username || '').toLowerCase() === OWNER;
+      return STAFF_IDS.includes(u.id) || STAFF.includes((u.username || '').toLowerCase());
     } catch (e) { return false; }
   },
 
