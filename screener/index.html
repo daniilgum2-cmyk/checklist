@@ -1304,6 +1304,10 @@ const DRAW_TYPES = ['trend', 'hray', 'path'];  // всё остальное из
    соседям: иначе нарисованное на минутке появится на 15M только после перезагрузки. */
 const DRAW_BUS = [];
 
+/* Буфер обмена рисунков — общий для всех графиков, чтобы Cmd+C на одном
+   таймфрейме вставлялся Cmd+V на другом (как в TradingView). */
+const DRAW_CLIP = [];
+
 /* SVG-иконки панели (18×18, currentColor) */
 const DRAW_ICONS = {
   cursor: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="2.2"/><path d="M9 1.5v3.2M9 13.3v3.2M1.5 9h3.2M13.3 9h3.2"/></svg>',
@@ -1325,7 +1329,8 @@ class DrawTools {
     this.items = [];
     this.draft = null;   // создаваемый рисунок
     this.ruler = null;   // линейка (эфемерная, не сохраняется)
-    this.sel = -1;
+    this.sel = [];       // индексы выделенных рисунков (Cmd+клик добавляет)
+    this.hidden = false; // Cmd+Alt+H прячет всю разметку
     this.drag = null;
     this._history = [];
     DRAW_BUS.push(this);
@@ -1351,9 +1356,9 @@ class DrawTools {
     const bar = document.createElement('div');
     bar.className = 'draw-toolbar';
     const groups = [
-      [['cursor', 'Курсор — выбрать, подвинуть', 'Esc']],
+      [['cursor', 'Курсор: выбрать, подвинуть, Cmd+клик — несколько', 'Esc']],
       [['trend', 'Линия тренда (Shift — ровно)', 'Alt+T'],
-       ['hray', 'Горизонтальный луч (уровень вправо)', 'Alt+H'],
+       ['hray', 'Горизонтальный луч (уровень вправо)', 'Alt+J'],
        ['path', 'Траектория цены: клик за кликом, двойной клик — конец', 'Alt+A']],
       [['ruler', 'Линейка (или Shift+протянуть)', 'Alt+M']],
     ];
@@ -1373,7 +1378,7 @@ class DrawTools {
     bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
     this.magnetBtn = document.createElement('button');
     this.magnetBtn.innerHTML = DRAW_ICONS.magnet;
-    this.magnetBtn.title = 'Магнит: привязка к свечам · Alt+S';
+    this.magnetBtn.title = 'Магнит: привязка к свечам · Alt+S (Cmd при перетаскивании точки — временно наоборот)';
     this.magnetBtn.classList.toggle('active', this.magnet);
     this.magnetBtn.addEventListener('click', () => this.toggleMagnet());
     bar.appendChild(this.magnetBtn);
@@ -1381,7 +1386,7 @@ class DrawTools {
     bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
     const del = document.createElement('button');
     del.innerHTML = DRAW_ICONS.trash;
-    del.title = 'Удалить выбранный рисунок · Delete';
+    del.title = 'Удалить выделенное · Delete, Backspace или клик колесом мыши';
     del.addEventListener('click', () => this._deleteSelected());
     bar.appendChild(del);
     const clear = document.createElement('button');
@@ -1409,11 +1414,76 @@ class DrawTools {
     this._toast(this.magnet ? 'Магнит включён' : 'Магнит выключен');
   }
 
+  _isSel(i) { return this.sel.includes(i); }
+
+  /* Сдвинуть рисунок на dt/dp от его ТЕКУЩЕГО положения (стрелки, вставка). */
+  _shift(it, dt, dp) {
+    if (it.type === 'hray') { it.t += dt; it.price += dp; return; }
+    if (it.type === 'path') { it.pts = it.pts.map(q => ({ t: q.t + dt, price: q.price + dp })); return; }
+    it.p1 = { t: it.p1.t + dt, price: it.p1.price + dp };
+    it.p2 = { t: it.p2.t + dt, price: it.p2.price + dp };
+  }
+
+  _anchorOf(it) {
+    if (it.type === 'hray') return { t: it.t, price: it.price };
+    if (it.type === 'path') return { t: it.pts[0].t, price: it.pts[0].price };
+    return { t: it.p1.t, price: it.p1.price };
+  }
+
+  /* Стрелки двигают выделенное на dx/dy ЭКРАННЫХ пикселей — как в TradingView,
+     то есть шаг одинаковый на любом масштабе. */
+  _nudge(dx, dy) {
+    if (!this.sel.length || !this.cv.candles) return;
+    const ts = this.cv.chart.timeScale();
+    const rx = this.cv._paneW() / 2, ry = this.cv._paneH() / 2;
+    const l0 = ts.coordinateToLogical(rx), l1 = ts.coordinateToLogical(rx + dx);
+    const p0 = this.cv.series.coordinateToPrice(ry), p1 = this.cv.series.coordinateToPrice(ry + dy);
+    const dt = (l0 != null && l1 != null) ? (l1 - l0) * this._iv() : 0;
+    const dp = (p0 != null && p1 != null) ? p1 - p0 : 0;
+    if (!dt && !dp) return;
+    this._pushHistory();
+    for (const i of this.sel) if (this.items[i]) this._shift(this.items[i], dt, dp);
+    this._save();
+    this.cv.requestDraw();
+  }
+
+  copySel() {
+    if (!this.sel.length) { this._toast('Нечего копировать'); return; }
+    DRAW_CLIP.length = 0;
+    for (const i of this.sel) if (this.items[i]) DRAW_CLIP.push(JSON.parse(JSON.stringify(this.items[i])));
+    this._toast(`Скопировано: ${DRAW_CLIP.length}`);
+  }
+
+  pasteClip() {
+    if (!DRAW_CLIP.length) { this._toast('Буфер пуст'); return; }
+    this._pushHistory();
+    const base = this._anchorOf(DRAW_CLIP[0]);
+    const to = this._lastPt || base;   // вставляем туда, где курсор
+    const dt = to.t - base.t, dp = to.price - base.price;
+    this.sel = [];
+    for (const src of DRAW_CLIP) {
+      const it = JSON.parse(JSON.stringify(src));
+      this._shift(it, dt, dp);
+      this.items.push(it);
+      this.sel.push(this.items.length - 1);
+    }
+    this._save();
+    this.cv.requestDraw();
+    this._toast(`Вставлено: ${DRAW_CLIP.length}`);
+  }
+
+  // Cmd+Alt+H — спрятать/показать всю разметку сразу на всех таймфреймах
+  toggleHidden() {
+    const v = !this.hidden;
+    for (const o of DRAW_BUS) { o.hidden = v; o.cv.requestDraw(); }
+    this._toast(v ? 'Рисунки скрыты' : 'Рисунки показаны');
+  }
+
   clearAll() {
     if (!this.items.length) return;
     this._pushHistory();
     this.items = [];
-    this.sel = -1;
+    this.sel = [];
     this.ruler = null;
     this._save();
     this.cv.requestDraw();
@@ -1442,7 +1512,7 @@ class DrawTools {
   undo() {
     if (!this._history.length) { this._toast('Отменять нечего'); return; }
     this.items = JSON.parse(this._history.pop());
-    this.sel = -1;
+    this.sel = [];
     this.draft = null;
     this._save();
     this.cv.requestDraw();
@@ -1458,9 +1528,22 @@ class DrawTools {
     const mod = e.metaKey || e.ctrlKey;
 
     if (mod && code === 'KeyZ') { e.preventDefault(); this.undo(); return; }
+    if (mod && e.altKey && code === 'KeyH') { e.preventDefault(); this.toggleHidden(); return; }
+    if (mod && code === 'KeyC') { e.preventDefault(); this.copySel(); return; }
+    if (mod && code === 'KeyV') { e.preventDefault(); this.pasteClip(); return; }
+
+    // стрелки двигают выделенное; с Shift — крупным шагом
+    const ARROW = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (ARROW[code] && this.sel.length && !mod) {
+      e.preventDefault();
+      const k = e.shiftKey ? 10 : 1;
+      this._nudge(ARROW[code][0] * k, ARROW[code][1] * k);
+      return;
+    }
 
     if (e.altKey && !mod) {
-      const map = { KeyT: 'trend', KeyH: 'hray', KeyA: 'path', KeyM: 'ruler' };
+      // Alt+J — горизонтальный луч, как в TradingView; Alt+H оставлен привычным алиасом
+      const map = { KeyT: 'trend', KeyJ: 'hray', KeyH: 'hray', KeyA: 'path', KeyM: 'ruler' };
       if (map[code]) {
         e.preventDefault();
         this.setTool(map[code]);
@@ -1481,10 +1564,10 @@ class DrawTools {
       e.preventDefault();
       if (this.draft) { this.draft = null; this.cv.requestDraw(); }
       else if (this.tool !== 'cursor') this.setTool('cursor');
-      else if (this.sel >= 0) { this.sel = -1; this.cv.requestDraw(); }
+      else if (this.sel.length) { this.sel = []; this.cv.requestDraw(); }
       return;
     }
-    if ((code === 'Delete' || code === 'Backspace') && this.sel >= 0) {
+    if ((code === 'Delete' || code === 'Backspace') && this.sel.length) {
       e.preventDefault();
       this._deleteSelected();
     }
@@ -1494,7 +1577,7 @@ class DrawTools {
     if (sym === this.symbol) return;
     this.symbol = sym;
     this.items = this._load(sym);
-    this.sel = -1;
+    this.sel = [];
     this.draft = null;
     this.ruler = null;
     this._history = [];
@@ -1529,7 +1612,7 @@ class DrawTools {
       if (o === this || o.symbol !== this.symbol) continue;
       o.items = JSON.parse(JSON.stringify(this.items));  // копия: перетаскивание не должно менять чужой список
       o._history = this._history.slice();
-      o.sel = -1;
+      o.sel = [];
       o.draft = null;
       o.drag = null;
       o.cv.requestDraw();
@@ -1537,10 +1620,11 @@ class DrawTools {
   }
 
   _deleteSelected() {
-    if (this.sel < 0) return;
+    if (!this.sel.length) return;
     this._pushHistory();
-    this.items.splice(this.sel, 1);
-    this.sel = -1;
+    // с конца, иначе индексы съедут при первом же splice
+    for (const i of [...this.sel].sort((a, b) => b - a)) this.items.splice(i, 1);
+    this.sel = [];
     this._save();
     this.cv.requestDraw();
   }
@@ -1562,7 +1646,9 @@ class DrawTools {
   // привязка к ближайшей свече: время → центр свечи, цена → ближайший из OHLC
   _snap(pt) {
     const cs = this.cv.candles;
-    if (!this.magnet || !cs || !cs.length) return pt;
+    // Cmd, зажатый при перетаскивании точки, временно переключает магнит
+    const on = this._cmd ? !this.magnet : this.magnet;
+    if (!on || !cs || !cs.length) return pt;
     if (pt.t > cs[cs.length - 1].t) return pt;  // справа от последней свечи магнититься не к чему
     let idx = Math.round((pt.t - cs[0].t) / this._iv());
     idx = Math.max(0, Math.min(cs.length - 1, idx));
@@ -1615,8 +1701,24 @@ class DrawTools {
 
   /* ---------- события ---------- */
   _down(e) {
-    if (e.button > 0 || !this.cv.candles) return;
+    if (!this.cv.candles) return;
     const { x, y } = this._xy(e);
+    // клик колесом мыши удаляет рисунок под курсором (как в TradingView)
+    if (e.button === 1) {
+      if (!this._inPane(x, y)) return;
+      const hit = this._hitTest(x, y);
+      if (hit) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._pushHistory();
+        this.items.splice(hit.i, 1);
+        this.sel = [];
+        this._save();
+        this.cv.requestDraw();
+      }
+      return;
+    }
+    if (e.button > 0) return;
     if (!this._inPane(x, y)) return;
     if (e.target.closest('.draw-toolbar') || e.target.closest('.chart-reset')) return;
     const pt = this._pt(x, y);
@@ -1636,15 +1738,23 @@ class DrawTools {
 
     if (this.tool === 'cursor') {
       const hit = this._hitTest(x, y);
+      const cmd = e.metaKey || e.ctrlKey;
       if (hit) {
-        this.sel = hit.i;
         this._pushHistory();  // перемещение тоже отменяется по Cmd+Z
-        this.drag = { i: hit.i, handle: hit.handle, x0: x, y0: y,
+        // Cmd без движения = добавить в выделение, Cmd + тянуть = клонировать.
+        // Что именно — решаем в _move/_up по первому движению.
+        if (!cmd && !this._isSel(hit.i)) this.sel = [hit.i];
+        this.drag = { i: hit.i, handle: hit.handle, x0: x, y0: y, cmd, moved: false, cloned: false,
                       orig: JSON.parse(JSON.stringify(this.items[hit.i])) };
+        // тянем за тело при нескольких выделенных — двигаем всю группу
+        if (hit.handle === 'body' && !cmd && this.sel.length > 1) {
+          this.drag.origs = {};
+          for (const i of this.sel) this.drag.origs[i] = JSON.parse(JSON.stringify(this.items[i]));
+        }
         e.preventDefault();
         e.stopPropagation();
-      } else if (this.sel >= 0) {
-        this.sel = -1;
+      } else if (this.sel.length) {
+        this.sel = [];
       }
       this.cv.requestDraw();
       return;
@@ -1672,7 +1782,7 @@ class DrawTools {
     if (this.tool === 'hray') {
       this._pushHistory();
       this.items.push({ type: 'hray', t: pt.t, price: pt.price });
-      this.sel = this.items.length - 1;
+      this.sel = [this.items.length - 1];
       this._save();
       this.setTool('cursor');
     } else if (this.tool === 'trend' || this.tool === 'ruler') {
@@ -1690,7 +1800,23 @@ class DrawTools {
     const pt = this._pt(cx, cy);
     if (!pt) return;
 
+    this._lastPt = pt;              // куда вставлять по Cmd+V
+    this._cmd = e.metaKey || e.ctrlKey;
+
     if (this.drag) {
+      if (!this.drag.moved && Math.hypot(x - this.drag.x0, y - this.drag.y0) > 3) {
+        this.drag.moved = true;
+        // Cmd + тянуть за тело — работаем с копией, оригинал остаётся на месте
+        if (this.drag.cmd && this.drag.handle === 'body' && !this.drag.cloned) {
+          const copy = JSON.parse(JSON.stringify(this.items[this.drag.i]));
+          this.items.push(copy);
+          this.drag.i = this.items.length - 1;
+          this.drag.orig = JSON.parse(JSON.stringify(copy));
+          this.drag.cloned = true;
+          this.sel = [this.drag.i];
+          this._toast('Копия рисунка');
+        }
+      }
       const it = this.items[this.drag.i];
       const o = this.drag.orig;
       const l0 = this.cv.chart.timeScale().coordinateToLogical(this.drag.x0);
@@ -1715,7 +1841,13 @@ class DrawTools {
           else dt = 0;
         }
       }
-      this._applyDrag(it, o, this.drag.handle, dt, dp, dragPt);
+      if (this.drag.origs) {
+        for (const [i, oi] of Object.entries(this.drag.origs)) {
+          if (this.items[i]) this._applyDrag(this.items[i], oi, 'body', dt, dp, dragPt);
+        }
+      } else {
+        this._applyDrag(it, o, this.drag.handle, dt, dp, dragPt);
+      }
       this.cv.requestDraw();
       return;
     }
@@ -1758,7 +1890,7 @@ class DrawTools {
     if (pts.length >= 2) {
       this._pushHistory();
       this.items.push({ type: 'path', pts });
-      this.sel = this.items.length - 1;
+      this.sel = [this.items.length - 1];
       this._save();
     }
     this.setTool('cursor');
@@ -1772,7 +1904,19 @@ class DrawTools {
 
   _up() {
     if (this.drag) {
+      const d = this.drag;
       this.drag = null;
+      if (!d.moved) {
+        this._history.pop();          // клик без перемещения историю не засоряет
+        if (d.cmd) {                  // Cmd+клик — добавить/убрать из выделения
+          const k = this.sel.indexOf(d.i);
+          if (k >= 0) this.sel.splice(k, 1); else this.sel.push(d.i);
+        } else {
+          this.sel = [d.i];
+        }
+        this.cv.requestDraw();
+        return;
+      }
       this._save();
       return;
     }
@@ -1787,7 +1931,7 @@ class DrawTools {
     } else if (moved) {
       this._pushHistory();
       this.items.push({ type: d.type, p1: d.p1, p2: d.p2 });
-      this.sel = this.items.length - 1;
+      this.sel = [this.items.length - 1];
       this._save();
       this.draft = null;
       this.setTool('cursor');
@@ -1876,7 +2020,7 @@ class DrawTools {
     const ctx = cvs.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    if (!this.cv.candles) return;
+    if (!this.cv.candles || this.hidden) return;   // Cmd+Alt+H — разметка спрятана
     const m = this._screen();
     if (!m.xOf) return;
     const paneW = this.cv._paneW(), paneH = this.cv._paneH();
@@ -1889,7 +2033,7 @@ class DrawTools {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    this.items.forEach((it, i) => this._renderItem(ctx, m, it, i === this.sel, paneW));
+    this.items.forEach((it, i) => this._renderItem(ctx, m, it, this._isSel(i), paneW));
     if (this.draft) {
       if (this.draft.type === 'ruler') this._renderRuler(ctx, m, this.draft);
       else this._renderItem(ctx, m, this.draft, false, paneW, true);
