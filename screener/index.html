@@ -544,6 +544,68 @@ footer {
   .reflink { order: -1; margin-left: 0; flex: 1 0 100%; text-align: center; padding: 5px 9px; font-size: 11px; }
 }
 
+/* ---------- шпаргалка по горячим клавишам ---------- */
+.draw-help {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  width: min(520px, calc(100% - 24px));
+  max-height: min(80%, 560px);
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(1, 4, 9, 0.75);
+  font-size: 12px;
+  color: #c9d1d9;
+}
+.draw-help[hidden] { display: none; }
+.dh-head {
+  display: flex; align-items: center;
+  position: sticky; top: -12px;
+  margin: -12px -16px 6px;
+  padding: 10px 16px 8px;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+}
+.dh-head b { font-size: 13px; color: #e6edf3; }
+.dh-x {
+  margin-left: auto;
+  background: transparent; border: 0; cursor: pointer;
+  color: #8b949e; font-size: 18px; line-height: 1; padding: 0 2px;
+}
+.dh-x:hover { color: #e6edf3; }
+.dh-group {
+  margin: 12px 0 5px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.4px; color: #6e7681;
+}
+.dh-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 0;
+  border-top: 1px solid #1c222b;
+}
+.dh-row > span:first-child { flex: 1; min-width: 0; }
+.dh-keys { display: flex; align-items: center; gap: 3px; flex: none; }
+.dh-keys kbd {
+  font: 11px/1 ui-monospace, Menlo, monospace;
+  color: #e6edf3;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 3px 6px;
+  white-space: nowrap;
+}
+.dh-keys i { font-style: normal; color: #6e7681; }
+
+@media (max-width: 760px) {
+  .draw-help { width: calc(100% - 16px); max-height: 82%; font-size: 12.5px; }
+  .dh-keys kbd { font-size: 11.5px; padding: 4px 7px; }
+}
+
 </style>
 </head>
 <body>
@@ -1308,6 +1370,45 @@ const DRAW_BUS = [];
    таймфрейме вставлялся Cmd+V на другом (как в TradingView). */
 const DRAW_CLIP = [];
 
+// на маке модификатор Cmd, на остальных Ctrl — в шпаргалке показываем «родной»
+const DRAW_MOD = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent) ? 'Cmd' : 'Ctrl';
+
+/* Шпаргалка по горячим клавишам (кнопка «?» в панели). Пары: действие → клавиши. */
+const DRAW_HELP = [
+  ['Инструменты', [
+    ['Линия тренда', ['Alt', 'T']],
+    ['Горизонтальный луч', ['Alt', 'J']],
+    ['Траектория цены', ['Alt', 'A']],
+    ['Линейка', ['Alt', 'M']],
+    ['Быстрая линейка', ['Shift', 'протянуть']],
+    ['Вернуться к курсору', ['Esc']],
+  ]],
+  ['Выделение и правка', [
+    ['Выделить несколько', [DRAW_MOD, 'клик']],
+    ['Клонировать рисунок', [DRAW_MOD, 'тянуть']],
+    ['Копировать', [DRAW_MOD, 'C']],
+    ['Вставить под курсор', [DRAW_MOD, 'V']],
+    ['Двигать выделенное', ['← ↑ → ↓']],
+    ['То же, крупным шагом', ['Shift', '← ↑ → ↓']],
+    ['Удалить выделенное', ['Delete']],
+    ['Удалить под курсором', ['клик колесом']],
+    ['Отменить', [DRAW_MOD, 'Z']],
+  ]],
+  ['Во время рисования', [
+    ['Ровно: горизонт, вертикаль, 45°', ['Shift']],
+    ['Двигать по одной оси', ['Shift', 'тянуть']],
+    ['Закончить траекторию', ['двойной клик']],
+    ['То же с клавиатуры', ['Enter']],
+    ['Магнит включить/выключить', ['Alt', 'S']],
+    ['Магнит наоборот на время', [DRAW_MOD, 'тянуть точку']],
+  ]],
+  ['График', [
+    ['Спрятать всю разметку', [DRAW_MOD, 'Alt', 'H']],
+    ['Стереть рисунки на монете', ['Alt', 'Backspace']],
+    ['Вернуть график к цене', ['двойной клик']],
+  ]],
+];
+
 /* SVG-иконки панели (18×18, currentColor) */
 const DRAW_ICONS = {
   cursor: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="2.2"/><path d="M9 1.5v3.2M9 13.3v3.2M1.5 9h3.2M13.3 9h3.2"/></svg>',
@@ -1317,6 +1418,7 @@ const DRAW_ICONS = {
   path: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 13.6 6 9.2l3 2.6 4.6-6.6"/><path d="M10.6 4.4h3.9v3.9"/></svg>',
   magnet: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 3v5.5a3.5 3.5 0 0 0 7 0V3"/><path d="M3.8 3h3.4M10.8 3h3.4"/></svg>',
   trash: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3.5 5.5h11M7 3.5h4M5 5.5l.8 9h6.4l.8-9M7.5 8v4M10.5 8v4"/></svg>',
+  help: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="6.6"/><path d="M7.1 6.9a1.95 1.95 0 1 1 2.6 1.85c-.5.2-.7.6-.7 1.1v.4"/><circle cx="9" cy="13" r=".75" fill="currentColor" stroke="none"/></svg>',
   clear: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg>',
 };
 
@@ -1394,6 +1496,14 @@ class DrawTools {
     clear.title = 'Стереть все рисунки на монете · Alt+Backspace';
     clear.addEventListener('click', () => this.clearAll());
     bar.appendChild(clear);
+
+    bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
+    const help = document.createElement('button');
+    help.innerHTML = DRAW_ICONS.help;
+    help.title = 'Горячие клавиши';
+    help.addEventListener('click', () => this.toggleHelp());
+    bar.appendChild(help);
+    this.helpBtn = help;
 
     this.cv.el.appendChild(bar);
     this.setTool('cursor');
@@ -1479,6 +1589,30 @@ class DrawTools {
     this._toast(v ? 'Рисунки скрыты' : 'Рисунки показаны');
   }
 
+  /* Шпаргалка: строится один раз при первом открытии. */
+  toggleHelp(open) {
+    if (!this.helpEl) {
+      const box = document.createElement('div');
+      box.className = 'draw-help';
+      box.hidden = true;
+      const keys = ks => ks.map(k => `<kbd>${k}</kbd>`).join('<i>+</i>');
+      box.innerHTML =
+        '<div class="dh-head"><b>Горячие клавиши</b><button type="button" class="dh-x" title="Закрыть · Esc">×</button></div>' +
+        DRAW_HELP.map(([title, rows]) =>
+          `<div class="dh-group">${title}</div>` +
+          rows.map(([label, ks]) => `<div class="dh-row"><span>${label}</span><span class="dh-keys">${keys(ks)}</span></div>`).join('')
+        ).join('');
+      box.querySelector('.dh-x').addEventListener('click', () => this.toggleHelp(false));
+      // клик внутри шпаргалки не должен доходить до графика
+      box.addEventListener('pointerdown', e => e.stopPropagation());
+      this.cv.el.appendChild(box);
+      this.helpEl = box;
+    }
+    const show = open == null ? this.helpEl.hidden : open;
+    this.helpEl.hidden = !show;
+    if (this.helpBtn) this.helpBtn.classList.toggle('active', show);
+  }
+
   clearAll() {
     if (!this.items.length) return;
     this._pushHistory();
@@ -1562,6 +1696,7 @@ class DrawTools {
     }
     if (code === 'Escape') {
       e.preventDefault();
+      if (this.helpEl && !this.helpEl.hidden) { this.toggleHelp(false); return; }
       if (this.draft) { this.draft = null; this.cv.requestDraw(); }
       else if (this.tool !== 'cursor') this.setTool('cursor');
       else if (this.sel.length) { this.sel = []; this.cv.requestDraw(); }
@@ -1701,6 +1836,8 @@ class DrawTools {
 
   /* ---------- события ---------- */
   _down(e) {
+    if (e.target.closest('.draw-toolbar') || e.target.closest('.chart-reset')
+        || e.target.closest('.draw-help')) return;
     if (!this.cv.candles) return;
     const { x, y } = this._xy(e);
     // клик колесом мыши удаляет рисунок под курсором (как в TradingView)
@@ -1720,7 +1857,6 @@ class DrawTools {
     }
     if (e.button > 0) return;
     if (!this._inPane(x, y)) return;
-    if (e.target.closest('.draw-toolbar') || e.target.closest('.chart-reset')) return;
     const pt = this._pt(x, y);
     if (!pt) return;
 
