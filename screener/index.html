@@ -619,16 +619,16 @@ footer {
     <input id="inpSearch" type="search" placeholder="Монета (BTC, SOL…)" autocomplete="off" spellcheck="false">
     <label>Топ
       <select id="selN">
-        <option value="5" selected>5</option>
+        <option value="5">5</option>
         <option value="8">8</option>
-        <option value="10">10</option>
+        <option value="10" selected>10</option>
       </select>
     </label>
     <label>Оборот ≥
       <select id="selTo">
         <option value="10000000">$10M</option>
-        <option value="30000000" selected>$30M</option>
-        <option value="100000000">$100M</option>
+        <option value="30000000">$30M</option>
+        <option value="100000000" selected>$100M</option>
       </select>
     </label>
     <button id="btnRefresh">⟳ Обновить</button>
@@ -2282,8 +2282,8 @@ const state = {
   symbol: null,
   top: [],
   all: [],        // все USDT-тикеры Bybit — для поиска любой монеты, не только топа
-  n: 5,
-  minTurnover: 30e6,
+  n: 10,
+  minTurnover: 100e6,
   busy: false,
   queued: false,
   search: '',
