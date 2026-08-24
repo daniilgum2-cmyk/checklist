@@ -606,6 +606,49 @@ footer {
   .dh-keys kbd { font-size: 11.5px; padding: 4px 7px; }
 }
 
+/* ---------- панель оповещений о пробое ---------- */
+.draw-alerts { width: min(380px, calc(100% - 24px)); }
+.al-info { margin: 10px 0 12px; line-height: 1.6; color: #9da7b3; }
+.al-info b { color: #e6edf3; }
+.al-form { display: flex; gap: 8px; }
+.al-price {
+  flex: 1; min-width: 0;
+  background: #0d1117; color: #e6edf3;
+  border: 1px solid #30363d; border-radius: 6px;
+  padding: 8px 10px;
+  font: 13px ui-monospace, Menlo, monospace;
+}
+.al-price:focus { outline: none; border-color: #1f6feb; }
+.al-go {
+  flex: none;
+  background: #1f6feb; color: #fff;
+  border: 0; border-radius: 6px;
+  padding: 8px 14px; cursor: pointer;
+  font-size: 12px; font-weight: 600;
+}
+.al-go:hover { background: #388bfd; }
+.al-dir { margin-top: 8px; font-size: 11px; color: #7d8590; min-height: 15px; }
+.al-dir b { color: #c9d1d9; }
+.al-cap { margin: 14px 0 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: #6e7681; }
+.al-cap.dim { text-transform: none; letter-spacing: 0; font-weight: 400; line-height: 1.5; }
+.al-lv {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; margin-bottom: 4px;
+  background: #0d1117; color: #e6edf3;
+  border: 1px solid #30363d; border-radius: 6px;
+  padding: 7px 10px; cursor: pointer;
+  font: 12px ui-monospace, Menlo, monospace;
+}
+.al-lv:hover { border-color: #58a6ff; }
+.al-lv i { font-style: normal; font-family: -apple-system, sans-serif; font-size: 11px; color: #7d8590; }
+.al-note { margin-top: 14px; padding-top: 10px; border-top: 1px solid #21262d; font-size: 11px; line-height: 1.5; color: #6e7681; }
+
+@media (max-width: 760px) {
+  .draw-alerts { width: calc(100% - 16px); }
+  .al-price, .al-go { font-size: 14px; padding: 10px 12px; }
+  .al-lv { padding: 10px 12px; font-size: 13px; }
+}
+
 </style>
 </head>
 <body>
@@ -1370,6 +1413,14 @@ const DRAW_BUS = [];
    таймфрейме вставлялся Cmd+V на другом (как в TradingView). */
 const DRAW_CLIP = [];
 
+/* Оповещения о пробое цены.
+   Скринер — статическая страница без сервера, поэтому оповещение ставится так:
+   собираем нагрузку «монета|цена|направление|таймфрейм», кодируем в base64url и
+   открываем t.me/<бот>?start=<нагрузка>. Telegram отправляет боту /start с этой
+   строкой, бот ставит оповещение и дальше сам сторожит цену круглосуточно.
+   Лимит Telegram на нагрузку — 64 символа, наша укладывается в ~40. */
+const ALERT_BOT = 'gumerovtraderbot';
+
 // на маке модификатор Cmd, на остальных Ctrl — в шпаргалке показываем «родной»
 const DRAW_MOD = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent) ? 'Cmd' : 'Ctrl';
 
@@ -1418,6 +1469,7 @@ const DRAW_ICONS = {
   path: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 13.6 6 9.2l3 2.6 4.6-6.6"/><path d="M10.6 4.4h3.9v3.9"/></svg>',
   magnet: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 3v5.5a3.5 3.5 0 0 0 7 0V3"/><path d="M3.8 3h3.4M10.8 3h3.4"/></svg>',
   trash: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3.5 5.5h11M7 3.5h4M5 5.5l.8 9h6.4l.8-9M7.5 8v4M10.5 8v4"/></svg>',
+  bell: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 12.6V8.2a4.4 4.4 0 0 1 8.8 0v4.4l1.3 1.6H3.3z"/><path d="M7.4 16.1a1.9 1.9 0 0 0 3.2 0"/></svg>',
   help: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="6.6"/><path d="M7.1 6.9a1.95 1.95 0 1 1 2.6 1.85c-.5.2-.7.6-.7 1.1v.4"/><circle cx="9" cy="13" r=".75" fill="currentColor" stroke="none"/></svg>',
   clear: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg>',
 };
@@ -1498,6 +1550,13 @@ class DrawTools {
     bar.appendChild(clear);
 
     bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
+    const bell = document.createElement('button');
+    bell.innerHTML = DRAW_ICONS.bell;
+    bell.title = 'Оповещение о пробое цены';
+    bell.addEventListener('click', () => this.toggleAlerts());
+    bar.appendChild(bell);
+    this.bellBtn = bell;
+
     const help = document.createElement('button');
     help.innerHTML = DRAW_ICONS.help;
     help.title = 'Горячие клавиши';
@@ -1587,6 +1646,109 @@ class DrawTools {
     const v = !this.hidden;
     for (const o of DRAW_BUS) { o.hidden = v; o.cv.requestDraw(); }
     this._toast(v ? 'Рисунки скрыты' : 'Рисунки показаны');
+  }
+
+  /* ---------- оповещения о пробое ---------- */
+
+  _alertSymbol() { return this.symbol || (typeof state !== 'undefined' ? state.symbol : '') || ''; }
+
+  _alertTf() {
+    try { return TF_CFG[state.mode].label; } catch (e) { return ''; }
+  }
+
+  _lastPrice() {
+    const cs = this.cv.candles;
+    return cs && cs.length ? cs[cs.length - 1].c : 0;
+  }
+
+  /* Открыть бота со ссылкой, по которой он поставит оповещение. */
+  _sendAlert(price) {
+    const sym = this._alertSymbol();
+    const last = this._lastPrice();
+    if (!sym || !(price > 0) || !last) { this._toast('Нужна цена больше нуля'); return; }
+    if (Math.abs(price - last) / last < 0.0001) { this._toast('Цена слишком близко к текущей'); return; }
+    const dir = price > last ? 'up' : 'down';
+    // округляем до точности графика: у уровня с графика цена сырая, с 16 знаками,
+    // и на дешёвых монетах нагрузка не влезла бы в лимит Telegram в 64 символа
+    const px = +Number(price).toFixed(this.cv.precision || 8);
+    const raw = `${sym}|${px}|${dir}|${this._alertTf()}`;
+    const payload = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    if (payload.length > 64) { this._toast('Слишком длинная цена'); return; }
+    const url = `https://t.me/${ALERT_BOT}?start=${payload}`;
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+    else window.open(url, '_blank', 'noopener');
+  }
+
+  /* Панель: цена вручную + быстрые кнопки по нарисованным горизонтальным уровням. */
+  toggleAlerts(open) {
+    if (!this.alertEl) {
+      const box = document.createElement('div');
+      box.className = 'draw-help draw-alerts';
+      box.hidden = true;
+      box.innerHTML =
+        '<div class="dh-head"><b>Оповещение о пробое</b><button type="button" class="dh-x" title="Закрыть · Esc">×</button></div>' +
+        '<div class="al-info"></div>' +
+        '<div class="al-form"><input type="text" inputmode="decimal" class="al-price" placeholder="цена"><button type="button" class="al-go">Поставить</button></div>' +
+        '<div class="al-dir"></div>' +
+        '<div class="al-levels"></div>' +
+        `<div class="al-note">Оповещение придёт в бота @${ALERT_BOT}. Сработает один раз, потом снимется. Все свои — команда /alerts в боте.</div>`;
+      box.querySelector('.dh-x').addEventListener('click', () => this.toggleAlerts(false));
+      const inp = box.querySelector('.al-price');
+      inp.addEventListener('input', () => this._alertDir());
+      inp.addEventListener('keydown', e => {
+        e.stopPropagation();                       // Esc и буквы не должны дёргать инструменты
+        if (e.key === 'Enter') this._sendAlert(parseFloat(inp.value.replace(',', '.')));
+      });
+      box.querySelector('.al-go').addEventListener('click', () => this._sendAlert(parseFloat(inp.value.replace(',', '.'))));
+      box.querySelector('.al-levels').addEventListener('click', e => {
+        const b = e.target.closest('[data-price]');
+        if (b) this._sendAlert(parseFloat(b.dataset.price));
+      });
+      this.cv.el.appendChild(box);
+      this.alertEl = box;
+    }
+    const show = open == null ? this.alertEl.hidden : open;
+    this.alertEl.hidden = !show;
+    if (this.bellBtn) this.bellBtn.classList.toggle('active', show);
+    clearInterval(this._alertTimer);
+    if (show) {
+      this._alertFill();
+      // цена живая: пока панель открыта, обновляем её и процент до уровня
+      this._alertTimer = setInterval(() => {
+        if (this.alertEl.hidden) { clearInterval(this._alertTimer); return; }
+        this._alertFill();
+      }, 1000);
+    }
+  }
+
+  _alertFill() {
+    const box = this.alertEl, last = this._lastPrice(), f = v => v.toFixed(this.cv.precision || 2);
+    box.querySelector('.al-info').innerHTML =
+      `<b>${this._alertSymbol() || '—'}</b> · ${this._alertTf()}<br>Цена сейчас: <b>${last ? f(last) : '—'}</b>`;
+    const inp = box.querySelector('.al-price');
+    if (!inp.value && last && document.activeElement !== inp) inp.value = f(last);
+    this._alertDir();
+    // уровни, которые уже нарисованы горизонтальным лучом на этой монете
+    const lv = this.items.filter(i => i.type === 'hray').map(i => i.price).sort((a, b) => b - a);
+    box.querySelector('.al-levels').innerHTML = lv.length
+      ? '<div class="al-cap">Уровни с графика</div>' + lv.map(pr =>
+          `<button type="button" class="al-lv" data-price="${pr}">${f(pr)} <i>${pr > last ? 'вверх ↑' : 'вниз ↓'}</i></button>`).join('')
+      : '<div class="al-cap dim">Нарисуй горизонтальный луч (Alt+J) — уровень появится здесь кнопкой</div>';
+  }
+
+  _alertDir() {
+    const box = this.alertEl, last = this._lastPrice();
+    const v = parseFloat((box.querySelector('.al-price').value || '').replace(',', '.'));
+    const el = box.querySelector('.al-dir');
+    if (!(v > 0) || !last) { el.textContent = ''; return; }
+    if (Math.abs(v - last) / last < 0.0001) {   // ровно текущая цена — направления нет
+      el.textContent = 'Укажи цену выше или ниже текущей';
+      return;
+    }
+    const up = v > last;
+    const pct = Math.abs(v - last) / last * 100;
+    el.innerHTML = `Сработает при пробое <b>${up ? 'вверх ↑' : 'вниз ↓'}</b> · ${pct.toFixed(2)}% от текущей`;
   }
 
   /* Шпаргалка: строится один раз при первом открытии. */
@@ -1697,6 +1859,7 @@ class DrawTools {
     if (code === 'Escape') {
       e.preventDefault();
       if (this.helpEl && !this.helpEl.hidden) { this.toggleHelp(false); return; }
+      if (this.alertEl && !this.alertEl.hidden) { this.toggleAlerts(false); return; }
       if (this.draft) { this.draft = null; this.cv.requestDraw(); }
       else if (this.tool !== 'cursor') this.setTool('cursor');
       else if (this.sel.length) { this.sel = []; this.cv.requestDraw(); }
@@ -1711,6 +1874,12 @@ class DrawTools {
   setSymbol(sym) {
     if (sym === this.symbol) return;
     this.symbol = sym;
+    // в панели оповещений осталась бы цена прошлой монеты — и оповещение
+    // ушло бы на уровень, которого у новой монеты нет
+    // Заполнять сразу нельзя: setSymbol зовётся ДО setData, свечи ещё от прошлой
+    // монеты — в поле попала бы её цена. Просто чистим, а обновит таймер панели,
+    // когда данные новой монеты уже приедут.
+    if (this.alertEl) this.alertEl.querySelector('.al-price').value = '';
     this.items = this._load(sym);
     this.sel = [];
     this.draft = null;
@@ -1837,7 +2006,7 @@ class DrawTools {
   /* ---------- события ---------- */
   _down(e) {
     if (e.target.closest('.draw-toolbar') || e.target.closest('.chart-reset')
-        || e.target.closest('.draw-help')) return;
+        || e.target.closest('.draw-help')) return;   // .draw-alerts тоже имеет класс .draw-help
     if (!this.cv.candles) return;
     const { x, y } = this._xy(e);
     // клик колесом мыши удаляет рисунок под курсором (как в TradingView)
