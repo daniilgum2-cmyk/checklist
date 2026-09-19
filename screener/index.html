@@ -791,7 +791,7 @@ footer {
 .draw-toolbar::-webkit-scrollbar { display: none; }
 .draw-toolbar .sep { grid-column: 1 / -1; }
 .draw-toolbar button { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-@media (pointer: coarse), (max-width: 760px) {
+@media (pointer: coarse) {
   .draw-toolbar { display: flex; flex-direction: column; }
   .draw-toolbar .sep { flex: none; }
 }
@@ -1877,6 +1877,8 @@ const DRAW_HELP = [
     ['Линейка', ['Alt', 'M'], 'own'],
     ['Быстрая линейка', ['Shift', '~протянуть'], 'tv'],
     ['Вернуться к курсору', ['Esc']],
+    ['Вернуться к курсору мышью (в Telegram на компьютере Esc не работает)', ['~ещё раз по значку инструмента']],
+    ['Отменить недорисованное мышью', ['~правый клик']],
   ]],
   ['Рисуем мышью', [
     ['Две точки: протяни или кликни, потом ещё раз', ['~мышь']],
@@ -2010,7 +2012,7 @@ class DrawTools {
     // инструмент: клик включает, долгое нажатие (или правый клик) открывает настройки
     const tool = (id, label, key) => {
       const b = mk(id, `${label} · ${key}` + (id === 'cursor' ? '' : ' · зажми значок — настройки'),
-                   () => { if (b._lp) { b._lp = false; return; } this.setTool(id); });
+                   () => { if (b._lp) { b._lp = false; return; } this.setTool(this.tool === id ? 'cursor' : id); });
       if (id !== 'cursor') this._longPress(b, () => this._formOpen(id, null, b));
       this.btns[id] = b;
       return b;
@@ -2152,6 +2154,12 @@ class DrawTools {
     // на панелях и кнопках оставляем обычное меню браузера
     if (e.target.closest(DRAW_UI_SEL)) return;
     if (!this.cv.candles) return;
+    if (this.draft) {   // правый клик отменяет недорисованное (то же, что Esc)
+      e.preventDefault();
+      this.draft = null;
+      this.cv.requestDraw();
+      return;
+    }
     const { x, y } = this._xy(e);
     if (!this._inPane(x, y)) return;
     const price = this.cv.series.coordinateToPrice(y);
@@ -2541,6 +2549,7 @@ class DrawTools {
   _newItem(type, geom) { return Object.assign({ type }, geom, drawStyleFor(type)); }
 
   _save() {
+    this._ctxClose();   // открытое меню рисунка после любой правки устарело
     if (!this.symbol) return;
     try {
       const all = JSON.parse(localStorage.getItem(DRAW_STORE) || '{}');
@@ -3994,6 +4003,12 @@ const Shot = (() => {
     toastTimer = setTimeout(() => toastEl.classList.remove('show'), kind === 'ok' ? 1600 : kind === 'wait' ? 12000 : 3400);
   }
 
+  // «Готовлю снимок…» убираем, как только снимок готов: дальше человек выбирает, куда его деть,
+  // и подсказка не должна висеть над системным окном «Поделиться»
+  function clearWait() {
+    if (toastEl && toastEl.classList.contains('wait')) toastEl.classList.remove('show');
+  }
+
   // На медленных телефонах кодирование PNG заметно: если снимок не готов за 0,45 с,
   // показываем «Готовлю снимок…», а по завершении убираем подсказку, если её никто не заменил
   async function withBusyHint(fn) {
@@ -4110,9 +4125,13 @@ const Shot = (() => {
       say('Снимок сохранён', 'Снимок сохранён файлом');
       return 'download';
     }
+    clearWait();
     const file = new File([blob], name, { type: 'image/png' });
     let canShare = false;
-    try { canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) {}
+    // «Поделиться» только на телефоне. На компьютере (Telegram Lite на Mac проверен) системное окно
+    // предлагает AirDrop, почту и контакты, но НЕ «сохранить в загрузки»: там нужно окно со снимком
+    const mobile = ['ios', 'android', 'android_x'].includes(tg.platform);
+    try { canShare = mobile && !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) {}
     if (canShare) {
       try {
         await navigator.share({ files: [file], title: 'GMV TRADES' });
@@ -4312,6 +4331,7 @@ const Keys = (() => {
         '<h3>Если сочетание не срабатывает</h3>' +
         '<ul class="kp-notes">' +
           '<li>Option на Mac и есть Alt: везде, где написано Alt, жми Option. Буква, которую Option печатает, в скринере не появится.</li>' +
+          '<li>Esc внутри Telegram на компьютере до скринера не доходит, его забирает сам Telegram. Вернуться к курсору можно значком курсора или повторным кликом по значку включённого инструмента, а недорисованное отменяет правый клик.</li>' +
           '<li>Нажал, а в проверке выше пусто: сочетание перехватила система или браузер. Тот же инструмент включается значком слева.</li>' +
           '<li>Cmd+Option+H в macOS ещё и «Скрыть остальные» окна. Если сработало оно, а разметка на месте, прячь её запасным Shift+Option+H или значком глаза на панели.</li>' +
           '<li>Правый клик на трекпаде: касание двумя пальцами (Системные настройки, Трекпад) или Ctrl+клик. Ещё меню рисунка открывает кнопка ⋮ на его панели.</li>' +
