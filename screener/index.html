@@ -2056,8 +2056,12 @@ class DrawTools {
     this.draft = null;
     for (const [k, b] of Object.entries(this.btns)) b.classList.toggle('active', k === id);
     // пока активен инструмент — жесты не двигают график (важно для тача)
-    this.cv.el.style.touchAction = id === 'cursor' ? '' : 'none';
+    this._touchLock();
     this.cv.requestDraw();
+  }
+
+  _touchLock() {
+    this.cv.el.style.touchAction = (this.tool !== 'cursor' || this.sel.length) ? 'none' : '';
   }
 
   toggleMagnet() {
@@ -3536,6 +3540,7 @@ Object.assign(DrawTools.prototype, {
   },
 
   _panelUpdate() {
+    this._touchLock();
     const fp = this._fp;
     const items = this.sel.map(i => this.items[i]).filter(Boolean);
     const busy = this.drag && this.drag.moved;   // пока тянем - панель не мешает
