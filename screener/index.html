@@ -80,6 +80,86 @@ header {
 #tfMenu button:hover { background: #21262d; color: #e6edf3; }
 #tfMenu button.active { background: #1f6feb22; color: #e6edf3; font-weight: 600; }
 
+/* камера: снимок графика (меню «Скачать» / «Скопировать»), живёт рядом с выбором таймфрейма */
+.hdrbtns { display: flex; align-items: center; gap: 8px; }
+.shotpick { position: relative; }
+.shotpick > button {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 30px; padding: 0;
+  background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+  color: #c9d1d9; cursor: pointer;
+}
+.shotpick > button:hover { background: #30363d; color: #e6edf3; }
+.shotpick > button[aria-expanded="true"] { background: #1f6feb22; border-color: #1f6feb; color: #e6edf3; }
+.shotpick > button svg { width: 17px; height: 17px; }
+#shotMenu {
+  position: absolute; top: calc(100% + 5px); right: 0; z-index: 40;
+  min-width: 176px; padding: 4px;
+  background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(1, 4, 9, 0.7);
+}
+#shotMenu[hidden] { display: none; }
+#shotMenu button {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: transparent; border: 0; border-radius: 5px;
+  padding: 8px 11px; cursor: pointer; text-align: left;
+  color: #c9d1d9; font-size: 12px; white-space: nowrap;
+}
+#shotMenu button:hover { background: #21262d; color: #e6edf3; }
+#shotMenu button svg { width: 15px; height: 15px; flex: none; color: #7d8590; }
+#shotMenu button:hover svg { color: #58a6ff; }
+
+/* подсказка внизу экрана (успех, откат на «Скачать», «график ещё загружается») */
+#toast {
+  position: fixed; left: 50%; bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(8px); z-index: 100;
+  display: flex; align-items: center; gap: 8px;
+  max-width: min(440px, calc(100vw - 24px));
+  padding: 9px 14px; border-radius: 8px;
+  background: rgba(22, 27, 34, 0.97); border: 1px solid #30363d;
+  box-shadow: 0 10px 28px rgba(1, 4, 9, 0.6);
+  color: #e6edf3; font-size: 12.5px; line-height: 1.35;
+  opacity: 0; pointer-events: none; transition: opacity .16s ease, transform .16s ease;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast svg { width: 16px; height: 16px; flex: none; }
+#toast.ok svg { color: #3fb950; }
+#toast.warn svg { color: #e3b341; }
+#toast.wait svg { color: #58a6ff; }
+#toast .spin { animation: shotspin .8s linear infinite; }
+@keyframes shotspin { to { transform: rotate(360deg); } }
+
+/* окно со снимком: только там, где Telegram не даёт скачать файл кодом */
+#shotSheet {
+  position: fixed; inset: 0; z-index: 95;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px; background: rgba(1, 4, 9, 0.78);
+}
+#shotSheet[hidden] { display: none; }
+.ss-card {
+  width: min(640px, 100%); max-height: 100%; overflow-y: auto;
+  background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+  padding: 12px 14px 14px;
+}
+.ss-head { display: flex; align-items: center; margin-bottom: 10px; }
+.ss-head b { font-size: 13px; color: #e6edf3; }
+.ss-x { margin-left: auto; background: transparent; border: 0; color: #8b949e; font-size: 22px; line-height: 1; padding: 0 4px; cursor: pointer; }
+.ss-x:hover { color: #e6edf3; }
+/* картинку должно быть можно долго нажать и сохранить: никаких запретов на callout и выделение */
+#shotSheet img {
+  display: block; width: 100%; max-height: 62vh; object-fit: contain;
+  border-radius: 8px; background: #0d1117;
+  -webkit-touch-callout: default; -webkit-user-select: auto; user-select: auto;
+}
+.ss-hint { margin: 10px 2px 0; font-size: 12px; line-height: 1.45; color: #9da7b3; }
+.ss-btns { display: flex; gap: 8px; margin-top: 10px; }
+.ss-btns:empty { display: none; }
+.ss-btns button {
+  flex: 1; padding: 9px 12px; border-radius: 7px; cursor: pointer;
+  background: #21262d; border: 1px solid #30363d; color: #e6edf3; font-size: 13px;
+}
+.ss-btns button:hover { background: #30363d; }
+
 .controls { display: flex; align-items: center; gap: 12px; margin-left: auto; font-size: 12px; color: #8b949e; }
 .controls select {
   background: #0d1117; color: #c9d1d9; border: 1px solid #30363d;
@@ -510,7 +590,15 @@ footer {
   header { flex-wrap: wrap; gap: 6px 8px; padding: 8px 10px; }
   .brand { font-size: 14px; }
   .brand .sub { display: none; }
-  .tfpick { margin-left: auto; }
+  .hdrbtns { margin-left: auto; }
+  /* под палец: кнопка и пункты меню не меньше ~40-44 px */
+  .shotpick > button { width: 40px; height: 34px; }
+  .shotpick > button svg { width: 19px; height: 19px; }
+  #shotMenu { min-width: 210px; }
+  #shotMenu button { padding: 14px 14px; font-size: 14px; gap: 11px; }
+  #shotMenu button svg { width: 18px; height: 18px; }
+  #toast { font-size: 13.5px; padding: 11px 15px; }
+  .ss-btns button { padding: 13px 12px; font-size: 14px; }
 
   .controls { width: 100%; margin-left: 0; gap: 8px; flex-wrap: wrap; }
   /* поиск — отдельной строкой во всю ширину, чтобы не сжимался */
@@ -691,15 +779,236 @@ footer {
   .chart-ctx button { padding: 11px 12px; font-size: 13px; }
 }
 
+/* ======================================================================
+   Рисование: панель в две колонки, плавающая панель рисунка, настройки, текст, вкладка клавиш
+   ====================================================================== */
+
+/* панель инструментов: на компьютере две колонки (все значки на виду), на тач-экране колонка с прокруткой */
+.draw-toolbar {
+  display: grid; grid-template-columns: repeat(2, 30px); gap: 1px;
+  max-height: calc(100% - 46px); overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain;
+}
+.draw-toolbar::-webkit-scrollbar { display: none; }
+.draw-toolbar .sep { grid-column: 1 / -1; }
+.draw-toolbar button { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+@media (pointer: coarse), (max-width: 760px) {
+  .draw-toolbar { display: flex; flex-direction: column; }
+  .draw-toolbar .sep { flex: none; }
+}
+
+/* плавающая панель у выделенного рисунка */
+.draw-fp {
+  position: absolute; z-index: 9;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px;
+  max-width: min(470px, calc(100% - 8px));
+  padding: 5px 8px;
+  background: rgba(22,27,34,0.97); border: 1px solid #30363d; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(1,4,9,0.6);
+}
+.draw-fp[hidden], .draw-fp [hidden] { display: none !important; }
+.fp-colors, .fp-widths { display: flex; align-items: center; gap: 4px; }
+.fp-c {
+  width: 18px; height: 18px; padding: 0; border-radius: 50%; cursor: pointer;
+  background: var(--c); border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+}
+.fp-c:hover { transform: scale(1.12); }
+.fp-c.on { border-color: #e6edf3; }
+.fp-w { width: 26px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; }
+.fp-w i { display: block; width: 15px; background: #b9c1cb; border-radius: 2px; }
+.fp-w:hover { background: #262c36; }
+.fp-w.on { background: rgba(47,129,247,0.25); }
+.fp-w.on i { background: #58a6ff; }
+.draw-fp > button {
+  width: 26px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #b9c1cb; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.draw-fp > button svg { width: 16px; height: 16px; }
+.draw-fp > button:hover { background: #262c36; color: #e6edf3; }
+.draw-fp > .fp-del:hover { color: #ff7b72; }
+.fp-fill svg { opacity: var(--lvl, 1); }
+.fp-sz { font: 700 12px -apple-system, "Segoe UI", sans-serif; }
+.fp-sep { width: 1px; height: 18px; background: #30363d; }
+@media (pointer: coarse) {
+  /* на телефоне панель встаёт правее колонки инструментов и переносится на два ряда */
+  .draw-fp { gap: 6px; padding: 6px 8px; max-width: calc(100% - 64px); }
+  .fp-c { width: 26px; height: 26px; }
+  .fp-w { width: 30px; height: 32px; }
+  .draw-fp > button { width: 32px; height: 32px; }
+  .draw-fp > button svg { width: 19px; height: 19px; }
+}
+
+/* меню рисунка: разделитель и опасное действие */
+.cx-sep { height: 1px; margin: 3px 4px; background: #21262d; }
+.chart-ctx button.danger { color: #ff7b72; }
+.chart-ctx button.danger svg { color: #ff7b72; }
+.chart-ctx button.danger:hover { background: rgba(248,81,73,0.14); }
+
+/* настройки инструмента (долгое нажатие на значок) */
+.draw-form {
+  position: absolute; z-index: 26;
+  width: min(300px, calc(100% - 16px)); max-height: calc(100% - 8px); overflow-y: auto;
+  padding: 10px 14px 12px;
+  background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(1,4,9,0.75);
+  font-size: 12px; color: #c9d1d9;
+}
+.draw-form .dh-head { position: static; margin: 0 0 4px; padding: 0 0 7px; }
+.df-note { margin: 4px 0 2px; font-size: 11px; color: #6e7681; }
+.df-cap { margin: 11px 0 5px; font-size: 11px; color: #8b949e; }
+.df-row, .df-lv { display: flex; flex-wrap: wrap; gap: 6px; }
+.df-c {
+  width: 24px; height: 24px; padding: 0; border-radius: 50%; cursor: pointer;
+  background: var(--c); border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+}
+.df-c.on { border-color: #e6edf3; }
+.df-s, .df-l {
+  padding: 5px 10px; border: 1px solid #30363d; border-radius: 6px; background: #21262d;
+  color: #c9d1d9; font-size: 12px; cursor: pointer;
+}
+.df-l { padding: 4px 8px; font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; }
+.df-s:hover, .df-l:hover { background: #2b323b; }
+.df-s.on, .df-l.on { border-color: #1f6feb; background: rgba(31,111,235,0.22); color: #e6edf3; }
+.df-checks { display: grid; gap: 8px; margin-top: 10px; }
+.df-k { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+.df-k input { width: 16px; height: 16px; margin: 0; accent-color: #1f6feb; }
+.df-reset {
+  margin-top: 13px; padding: 0; border: 0; background: none; cursor: pointer;
+  color: #8b949e; font-size: 11.5px; text-decoration: underline;
+}
+.df-reset:hover { color: #e6edf3; }
+@media (max-width: 760px), (pointer: coarse) {
+  .df-c { width: 30px; height: 30px; }
+  .df-s, .df-l { padding: 9px 12px; font-size: 13px; }
+  .df-k input { width: 20px; height: 20px; }
+}
+
+/* ввод текста прямо на графике */
+.draw-textin {
+  position: absolute; z-index: 12; width: 180px; padding: 5px 9px;
+  background: #0d1117; color: #e6edf3; border: 1px solid #58a6ff; border-radius: 6px; outline: none;
+  font: 600 16px -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+}
+
+/* шпаргалка-окошко: пометка «как в TradingView», жесты и ссылка на вкладку */
+.dh-tv {
+  margin-left: 6px; padding: 1px 4px; border-radius: 3px; vertical-align: 1px;
+  font: normal 9px/1.3 -apple-system, sans-serif; letter-spacing: 0.3px;
+  color: #58a6ff; background: rgba(47,129,247,0.14);
+}
+.dh-g { font-size: 11px; color: #9da7b3; white-space: nowrap; }
+.dh-open {
+  display: block; width: 100%; margin-top: 14px; padding: 9px 12px; cursor: pointer;
+  background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; font-size: 12px;
+}
+.dh-open:hover { background: #2b323b; border-color: #58a6ff; }
+
+/* значок клавиатуры в шапке */
+.hdrbtn {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 30px; padding: 0;
+  background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+  color: #c9d1d9; cursor: pointer;
+}
+.hdrbtn:hover { background: #30363d; color: #e6edf3; }
+.hdrbtn.active { background: #1f6feb22; border-color: #1f6feb; color: #e6edf3; }
+.hdrbtn svg { width: 17px; height: 17px; }
+@media (max-width: 760px) {
+  .hdrbtn { width: 40px; height: 34px; }
+  .hdrbtn svg { width: 19px; height: 19px; }
+}
+
+/* ---------- вкладка «Горячие клавиши» ---------- */
+#keysPage {
+  position: fixed; left: 0; right: 0; bottom: 0; top: 52px; z-index: 60;
+  background: #0d1117; overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+#keysPage[hidden] { display: none; }
+.kp-wrap { max-width: 880px; margin: 0 auto; padding: 18px 16px 70px; }
+.kp-top { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+.kp-top h2 { flex: 1; margin: 0; font-size: 19px; color: #e6edf3; }
+.kp-back, .kp-os button {
+  padding: 6px 12px; border: 1px solid #30363d; background: #21262d; color: #c9d1d9;
+  border-radius: 6px; font-size: 12px; cursor: pointer;
+}
+.kp-back:hover, .kp-os button:hover { background: #30363d; color: #e6edf3; }
+.kp-os { display: flex; }
+.kp-os button:first-child { border-radius: 6px 0 0 6px; }
+.kp-os button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+.kp-os button.on { background: rgba(31,111,235,0.25); border-color: #1f6feb; color: #e6edf3; position: relative; }
+.kp-lead { margin: 12px 0 14px; color: #9da7b3; font-size: 13px; line-height: 1.55; }
+.kp-search {
+  width: 100%; padding: 9px 12px; background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+  color: #e6edf3; font-size: 14px; outline: none;
+}
+.kp-search:focus { border-color: #1f6feb; }
+#keysPage h3 { margin: 24px 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #6e7681; }
+.kp-list { border: 1px solid #21262d; border-radius: 8px; overflow: hidden; background: #0f141b; }
+.kp-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-top: 1px solid #1c222b; }
+.kp-row:first-child { border-top: 0; }
+.kp-l { flex: 1; min-width: 0; font-size: 13px; }
+.kp-tag {
+  margin-left: 8px; padding: 1px 6px; border-radius: 9px; vertical-align: 1px;
+  font: normal 10px/1.4 -apple-system, sans-serif; white-space: nowrap;
+}
+.kp-tag.tv { color: #58a6ff; background: rgba(47,129,247,0.14); }
+.kp-tag.own { color: #d2a8ff; background: rgba(163,113,247,0.14); }
+.kp-tag.none { color: #8b949e; background: #21262d; }
+.kp-empty { padding: 26px 12px; text-align: center; color: #6e7681; }
+.kp-test {
+  padding: 18px 16px; min-height: 130px; border: 1px dashed #3d444d; border-radius: 10px; background: #0f141b;
+  outline: none; cursor: text; text-align: center;
+}
+.kp-test.armed { border-color: #1f6feb; background: rgba(31,111,235,0.06); }
+.kp-hint { color: #8b949e; font-size: 13px; padding: 20px 0; }
+.kp-combo { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.kp-combo kbd {
+  font: 600 18px/1 ui-monospace, Menlo, monospace; color: #e6edf3; background: #21262d;
+  border: 1px solid #30363d; border-bottom-width: 3px; border-radius: 6px; padding: 8px 12px;
+}
+.kp-combo i { font-style: normal; color: #6e7681; }
+.kp-info { font: 11.5px ui-monospace, Menlo, monospace; color: #8b949e; }
+.kp-verdict { margin-top: 8px; font-size: 13px; }
+.kp-verdict.ok { color: #3fb950; }
+.kp-verdict.none { color: #9da7b3; }
+.kp-notes { margin: 0; padding-left: 18px; color: #9da7b3; font-size: 13px; line-height: 1.6; }
+.kp-notes li { margin: 6px 0; }
+@media (max-width: 760px) {
+  .kp-wrap { padding: 14px 12px 60px; }
+  .kp-row { padding: 10px 10px; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+  .kp-l { flex: 1 1 150px; }
+  .kp-row .dh-keys { flex: none; }
+  .kp-search { font-size: 16px; }
+}
+.draw-toolbar button:focus { outline: none; }
+.draw-toolbar button:focus-visible { outline: 1px solid rgba(88,166,255,0.7); outline-offset: -2px; }
+/* настройки инструмента на телефоне: лист снизу поверх страницы */
+.draw-form.sheet {
+  position: fixed; left: 8px; right: 8px; top: auto; width: auto;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  max-height: 72vh; z-index: 90;
+}
+
 </style>
 </head>
 <body>
 <header>
   <div class="brand">SMC-скринер <span class="sub">Bybit Futures</span></div>
-  <nav class="tfpick">
-    <button id="btnTf" type="button" aria-haspopup="true" aria-expanded="false" title="Таймфрейм"><span id="curTf">15M</span><i>▾</i></button>
-    <div id="tfMenu" hidden></div>
-  </nav>
+  <div class="hdrbtns">
+    <nav class="tfpick">
+      <button id="btnTf" type="button" aria-haspopup="true" aria-expanded="false" title="Таймфрейм"><span id="curTf">15M</span><i>▾</i></button>
+      <div id="tfMenu" hidden></div>
+    </nav>
+    <nav class="shotpick">
+      <button id="btnShot" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Снимок графика" title="Снимок графика"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5c0-.9.7-1.6 1.6-1.6h1.6l1.1-1.7h4.4l1.1 1.7h1.6c.9 0 1.6.7 1.6 1.6v6.1c0 .9-.7 1.6-1.6 1.6H3.6c-.9 0-1.6-.7-1.6-1.6z"/><circle cx="9" cy="9.6" r="2.6"/></svg></button>
+      <div id="shotMenu" hidden>
+        <button type="button" data-act="download"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.8v8.2M5.6 7.8 9 11.2l3.4-3.4M3.2 14.6h11.6"/></svg><span>Скачать</span></button>
+        <button type="button" data-act="copy"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="6.4" y="6.4" width="8.2" height="8.2" rx="1.6"/><path d="M11.6 6.4V5a1.6 1.6 0 0 0-1.6-1.6H5A1.6 1.6 0 0 0 3.4 5v5a1.6 1.6 0 0 0 1.6 1.6h1.4"/></svg><span>Скопировать</span></button>
+      </div>
+    </nav>
+    <button id="btnKeys" class="hdrbtn" type="button" aria-label="Горячие клавиши" title="Горячие клавиши и подсказки по инструментам"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="4.2" width="14.4" height="9.6" rx="1.8"/><path d="M4.6 7.2h.01M7.4 7.2h.01M10.2 7.2h.01M13 7.2h.01M5.4 10.8h7.2"/></svg></button>
+  </div>
   <div class="controls">
     <input id="inpSearch" type="search" placeholder="Монета (BTC, SOL…)" autocomplete="off" spellcheck="false">
     <label>Топ
@@ -1333,6 +1642,13 @@ class ChartView {
     const ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    this._paint(ctx);
+  }
+
+  /* Рисует SMC-разметку (зоны, уровни, линии структуры, полосы) в ctx. Координаты в
+     CSS-пикселях: transform выставляет вызывающий. Один и тот же код рисует и экран (draw),
+     и снимок графика (shot.js), поэтому они не могут разойтись. */
+  _paint(ctx) {
     if (!this.candles || !this.drawings) return;
 
     const xOf = this._xMapper();
@@ -1437,14 +1753,85 @@ class ChartView {
 
 </script>
 <script>
-/* Инструменты рисования поверх графика (минимальный набор под скальпинг пробоев):
-   курсор, линия тренда, горизонтальный луч (уровень от точки вправо),
+/* Инструменты рисования поверх графика (набор под скальпинг пробоев): курсор, линия тренда,
+   горизонтальный луч, вертикаль, перекрестие, прямоугольник, эллипс, фибо, кисть, текст,
    линейка (Δ% и бары, эфемерная), траектория цены (ломаная из колен).
+   Плавающая панель, меню рисунка, настройки инструментов и правка текста - в draw2.js.
    Горячие клавиши как в TradingView, магнит к свечам, отмена Cmd+Z.
    Рисунки хранятся в localStorage по символу в координатах время+цена,
    поэтому переживают обновление свечей и видны на всех таймфреймах. */
 const DRAW_STORE = 'smc_drawings_v1';
-const DRAW_TYPES = ['trend', 'hray', 'path'];  // всё остальное из старых версий игнорируем
+const DRAW_TYPES = ['trend', 'hray', 'path', 'rect', 'ellipse', 'vline', 'cross', 'fib', 'brush', 'text'];  // всё остальное из старых версий игнорируем
+
+/* Из скольких «точек» состоит рисунок. От этого зависят сдвиг, перетаскивание и поиск под курсором.
+   two: p1+p2 (углы или концы); one: t+price; time: только t (вертикаль); many: pts[] */
+const DRAW_KIND = { trend: 'two', rect: 'two', ellipse: 'two', fib: 'two', hray: 'one', cross: 'one', text: 'one',
+                    vline: 'time', path: 'many', brush: 'many' };
+
+// Цвета и толщина по умолчанию. У рисунков, сохранённых раньше, полей c/w нет: берём отсюда, вид не меняется
+const DRAW_COLOR0 = { trend: '#58a6ff', path: '#58a6ff', hray: '#e6edf3', vline: '#e6edf3', cross: '#8b949e',
+                      rect: '#58a6ff', ellipse: '#a371f7', fib: '#e3b341', brush: '#f0883e', text: '#e6edf3' };
+const DRAW_WIDTH0 = { trend: 1.7, path: 1.7, hray: 1.4, vline: 1.2, cross: 1, rect: 1.5, ellipse: 1.5, fib: 1.2, brush: 2, text: 1 };
+const DRAW_PALETTE = ['#58a6ff', '#e6edf3', '#3fb950', '#ef5350', '#e3b341', '#a371f7', '#f0883e', '#8b949e'];
+const DRAW_WIDTHS = [1, 2, 3.5];
+// куда кладём элементы интерфейса поверх графика: по клику на них рисование не начинается
+const DRAW_UI_SEL = '.draw-toolbar, .chart-reset, .draw-help, .draw-fp, .draw-form, .chart-ctx, .draw-textin';
+
+const dCol = it => it.c || DRAW_COLOR0[it.type] || '#58a6ff';
+const dWid = it => it.w || DRAW_WIDTH0[it.type] || 1.5;
+function drawRgba(hex, a) {
+  const n = parseInt(String(hex).slice(1), 16) || 0;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/* Настройки по умолчанию (долгое нажатие на значок инструмента): одни на все графики,
+   хранятся в браузере. У созданного рисунка стиль копируется в сам рисунок, поэтому
+   позднейшая смена настроек старые рисунки не перекрашивает. */
+const DRAW_DEF_KEY = 'smc_draw_defaults';
+const DRAW_DEF = (() => { try { return JSON.parse(localStorage.getItem(DRAW_DEF_KEY) || '{}') || {}; } catch (e) { return {}; } })();
+function drawDefSave() { try { localStorage.setItem(DRAW_DEF_KEY, JSON.stringify(DRAW_DEF)); } catch (e) {} }
+
+const DRAW_NAMES = { trend: 'Линия тренда', hray: 'Горизонтальный луч', vline: 'Вертикальная линия', cross: 'Перекрестие',
+                     rect: 'Прямоугольник', ellipse: 'Эллипс', fib: 'Фибо-уровни', brush: 'Кисть', text: 'Текст',
+                     path: 'Траектория', ruler: 'Линейка' };
+
+// Уровни Фибоначчи как в TradingView: 0 - конец рисунка (p2), 1 - начало (p1), отрицательные - цели за концом
+const FIB_LEVELS_ALL = [-0.618, -0.272, 0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.272, 1.618];
+const FIB_LEVELS0 = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const DRAW_FILLS = [0, 0.12, 0.28];          // заливка: нет / лёгкая / плотная
+const TEXT_SIZES = [11, 14, 18, 24];
+
+const drawFont = sz => `600 ${sz}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+const drawMeasure = (() => { let c = null; return () => c || (c = document.createElement('canvas').getContext('2d')); })();
+
+// стиль нового рисунка: настройки инструмента (долгое нажатие на значок) поверх заводских
+function drawStyleFor(type) {
+  const d = DRAW_DEF[type] || {};
+  const st = { c: d.c || DRAW_COLOR0[type], w: d.w || DRAW_WIDTH0[type] };
+  if (type === 'rect' || type === 'ellipse') st.fa = d.fa != null ? d.fa : DRAW_FILLS[1];
+  if (type === 'text') { st.sz = d.sz || TEXT_SIZES[1]; delete st.w; }
+  if (type === 'fib') {
+    st.lv = (d.lv && d.lv.length ? d.lv : FIB_LEVELS0).slice();
+    st.ext = d.ext ? 1 : 0;
+    st.lab = d.lab === 0 ? 0 : 1;
+  }
+  return st;
+}
+
+/* Сочетания «Alt+буква» -> инструмент. Сверено 2026-09-19 со встроенным списком TradingView
+   (Help - Keyboard shortcuts): tv = как у них. У эллипса, кисти и текста в TradingView клавиш
+   нет, поэтому и у нас нет: не придумываем сочетания, которых там не будет. */
+const DRAW_HOTKEYS = [
+  { code: 'KeyT', tool: 'trend', tv: true },
+  { code: 'KeyJ', tool: 'hray', tv: true },
+  { code: 'KeyH', tool: 'hray', alias: true },              // в TradingView Alt+H - горизонтальная линия, у нас луч
+  { code: 'KeyV', tool: 'vline', tv: true },
+  { code: 'KeyC', tool: 'cross', tv: true },
+  { code: 'KeyF', tool: 'fib', tv: true },
+  { code: 'KeyR', shift: true, tool: 'rect', tv: true },
+  { code: 'KeyA', tool: 'path' },
+  { code: 'KeyM', tool: 'ruler' },
+];
 
 /* У каждого таймфрейма (15M/5M/1M) свой экземпляр DrawTools со своей копией
    рисунков в памяти. Список нужен, чтобы после правки разослать свежие рисунки
@@ -1463,45 +1850,78 @@ const DRAW_CLIP = [];
    Лимит Telegram на нагрузку — 64 символа, наша укладывается в ~40. */
 const ALERT_BOT = 'gumerovtraderbot';
 
-// на маке модификатор Cmd, на остальных Ctrl — в шпаргалке показываем «родной»
-const DRAW_MOD = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent) ? 'Cmd' : 'Ctrl';
+// На маке модификатор Cmd (metaKey), на остальных Ctrl. Alt в событиях = физическая клавиша Option.
+// Ctrl+клик на маке система превращает в правый клик, поэтому Ctrl там за модификатор НЕ считаем
+const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+const DRAW_MOD = IS_MAC ? 'Cmd' : 'Ctrl';
+const DRAW_ALT = IS_MAC ? 'Option' : 'Alt';
+const modKey = e => (IS_MAC ? e.metaKey : e.ctrlKey);
 
-/* Шпаргалка по горячим клавишам (кнопка «?» в панели). Пары: действие → клавиши. */
+/* Шпаргалка по горячим клавишам (кнопка «?» и вкладка «Клавиши»). Строка: [действие, клавиши, пометка].
+   Клавиши: Alt и Mod подставляются под платформу (Option/Cmd на маке), «~текст» - жест мышью.
+   Пометка: tv = как в TradingView (сверено 2026-09-19 с их списком), own = своё, none = у инструмента клавиши нет
+   (как и в TradingView: у эллипса, кисти и текста сочетаний нет). */
 const DRAW_HELP = [
-  ['Инструменты', [
-    ['Линия тренда', ['Alt', 'T']],
-    ['Горизонтальный луч', ['Alt', 'J']],
-    ['Траектория цены', ['Alt', 'A']],
-    ['Линейка', ['Alt', 'M']],
-    ['Быстрая линейка', ['Shift', 'протянуть']],
+  ['Инструменты: кликни по значку слева, клавиши не нужны', [
+    ['Линия тренда', ['Alt', 'T'], 'tv'],
+    ['Горизонтальный луч', ['Alt', 'J'], 'tv'],
+    ['Горизонтальный луч, привычный вариант', ['Alt', 'H'], 'own'],
+    ['Вертикальная линия', ['Alt', 'V'], 'tv'],
+    ['Перекрестие (кросслайн)', ['Alt', 'C'], 'tv'],
+    ['Фибо-уровни', ['Alt', 'F'], 'tv'],
+    ['Прямоугольник', ['Shift', 'Alt', 'R'], 'tv'],
+    ['Эллипс', ['~только мышью'], 'none'],
+    ['Кисть', ['~только мышью'], 'none'],
+    ['Текстовая метка', ['~только мышью'], 'none'],
+    ['Траектория цены', ['Alt', 'A'], 'own'],
+    ['Линейка', ['Alt', 'M'], 'own'],
+    ['Быстрая линейка', ['Shift', '~протянуть'], 'tv'],
     ['Вернуться к курсору', ['Esc']],
   ]],
-  ['Выделение и правка', [
-    ['Выделить несколько', [DRAW_MOD, 'клик']],
-    ['Клонировать рисунок', [DRAW_MOD, 'тянуть']],
-    ['Копировать', [DRAW_MOD, 'C']],
-    ['Вставить под курсор', [DRAW_MOD, 'V']],
-    ['Двигать выделенное', ['← ↑ → ↓']],
-    ['То же, крупным шагом', ['Shift', '← ↑ → ↓']],
-    ['Удалить выделенное', ['Delete']],
-    ['Удалить под курсором', ['клик колесом']],
-    ['Отменить', [DRAW_MOD, 'Z']],
+  ['Рисуем мышью', [
+    ['Две точки: протяни или кликни, потом ещё раз', ['~мышь']],
+    ['Квадрат и круг', ['Shift', '~при рисовании'], 'tv'],
+    ['Ровная линия: горизонт, вертикаль, 45°', ['Shift'], 'tv'],
+    ['Закончить траекторию', ['~двойной клик']],
+    ['Настройки инструмента: цвет, уровни фибо', ['~зажми значок']],
+    ['Панель цвета, толщины, копии и удаления', ['~клик по рисунку']],
+    ['Меню рисунка', ['~правый клик']],
+    ['Меню рисунка без правого клика', ['~кнопка ⋮ на панели']],
   ]],
-  ['Во время рисования', [
-    ['Ровно: горизонт, вертикаль, 45°', ['Shift']],
-    ['Двигать по одной оси', ['Shift', 'тянуть']],
-    ['Закончить траекторию', ['двойной клик']],
-    ['То же с клавиатуры', ['Enter']],
-    ['Магнит включить/выключить', ['Alt', 'S']],
-    ['Магнит наоборот на время', [DRAW_MOD, 'тянуть точку']],
+  ['Выделение и правка', [
+    ['Выделить несколько', ['Mod', '~клик'], 'tv'],
+    ['Клонировать рисунок', ['Mod', '~тянуть'], 'tv'],
+    ['Копировать', ['Mod', 'C'], 'tv'],
+    ['Вставить под курсор', ['Mod', 'V'], 'tv'],
+    ['Двигать выделенное', ['← ↑ → ↓'], 'tv'],
+    ['То же, крупным шагом', ['Shift', '← ↑ → ↓']],
+    ['Двигать по одной оси', ['Shift', '~тянуть'], 'tv'],
+    ['Удалить выделенное', ['Delete'], 'tv'],
+    ['Удалить под курсором', ['~клик колесом'], 'tv'],
+    ['Отменить', ['Mod', 'Z']],
   ]],
   ['График', [
-    ['Меню на цене: оповещение, уровень, копировать', ['правый клик']],
-    ['Спрятать всю разметку', [DRAW_MOD, 'Alt', 'H']],
-    ['Стереть рисунки на монете', ['Alt', 'Backspace']],
-    ['Вернуть график к цене', ['двойной клик']],
+    ['Магнит включить / выключить', ['Alt', 'S'], 'own'],
+    ['Магнит наоборот на время', ['Mod', '~тянуть точку'], 'tv'],
+    ['Меню на цене: оповещение, уровень, копировать', ['~правый клик']],
+    ['Спрятать всю разметку', ['Mod', 'Alt', 'H'], 'tv'],
+    ['Спрятать разметку, запасное сочетание', ['Shift', 'Alt', 'H'], 'own'],
+    ['Стереть рисунки на монете', ['Alt', 'Backspace'], 'own'],
+    ['Вернуть график к цене', ['~двойной клик']],
   ]],
 ];
+
+/* Текст клавиши под платформу. В данных шпаргалки: Alt / Mod - «родные» клавиши платформы,
+   значение с ~ - жест мышью (рисуется обычным текстом, а не клавишей). */
+function drawKeyLabel(tok, mac) {
+  if (tok === 'Alt') return mac ? 'Option' : 'Alt';
+  if (tok === 'Mod') return mac ? 'Cmd' : 'Ctrl';
+  return tok;
+}
+function drawKeysHtml(ks, mac = IS_MAC) {
+  return ks.map(k => k[0] === '~' ? `<span class="dh-g">${k.slice(1)}</span>` : `<kbd>${drawKeyLabel(k, mac)}</kbd>`)
+           .join('<i>+</i>');
+}
 
 /* SVG-иконки панели (18×18, currentColor) */
 const DRAW_ICONS = {
@@ -1515,6 +1935,21 @@ const DRAW_ICONS = {
   bell: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 12.6V8.2a4.4 4.4 0 0 1 8.8 0v4.4l1.3 1.6H3.3z"/><path d="M7.4 16.1a1.9 1.9 0 0 0 3.2 0"/></svg>',
   help: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="6.6"/><path d="M7.1 6.9a1.95 1.95 0 1 1 2.6 1.85c-.5.2-.7.6-.7 1.1v.4"/><circle cx="9" cy="13" r=".75" fill="currentColor" stroke="none"/></svg>',
   copy: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="6.4" y="6.4" width="8.2" height="8.2" rx="1.6"/><path d="M11.6 6.4V5a1.6 1.6 0 0 0-1.6-1.6H5A1.6 1.6 0 0 0 3.4 5v5a1.6 1.6 0 0 0 1.6 1.6h1.4"/></svg>',
+  rect: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="3" y="4.5" width="12" height="9" rx="1"/></svg>',
+  ellipse: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="9" cy="9" rx="6.4" ry="4.4"/></svg>',
+  vline: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M9 2v14"/><circle cx="9" cy="9" r="1.7" fill="#161b22"/></svg>',
+  cross: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M9 2v14M2 9h14"/><circle cx="9" cy="9" r="1.7" fill="#161b22"/></svg>',
+  fib: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M3 3.8h12M3 7.2h12M3 10.8h12M3 14.2h12"/><path d="M4.4 14.2 13.6 3.8" stroke-dasharray="1.6 1.6"/></svg>',
+  brush: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13.6c1.4-5.4 2.6-7.4 4.2-4.6s2.6 1.6 3.6-2.2c.6-2.3 2.6-1.6 4.2 1.4"/></svg>',
+  text: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4.6h10M9 4.6v9.2M7 13.8h4"/></svg>',
+  dots: '<svg viewBox="0 0 18 18" fill="currentColor"><circle cx="9" cy="3.6" r="1.4"/><circle cx="9" cy="9" r="1.4"/><circle cx="9" cy="14.4" r="1.4"/></svg>',
+  fill: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3.4" y="3.4" width="11.2" height="11.2" rx="1.4"/><path d="M3.4 10.2 10.2 3.4M3.4 14.6 14.6 3.4M7.6 14.6l7-7" stroke-width="1"/></svg>',
+  edit: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14.6 4 11l7.6-7.6a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2L7 14z"/></svg>',
+  gear: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="2.3"/><path d="M9 1.8v2.2M9 14v2.2M1.8 9H4M14 9h2.2M3.9 3.9l1.5 1.5M12.6 12.6l1.5 1.5M14.1 3.9l-1.5 1.5M5.4 12.6l-1.5 1.5"/></svg>',
+  eye: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 9S4.6 4.2 9 4.2 16.2 9 16.2 9 13.4 13.8 9 13.8 1.8 9 1.8 9z"/><circle cx="9" cy="9" r="2.2"/></svg>',
+  front: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.6" y="2.6" width="8" height="8" rx="1" stroke-dasharray="2 2"/><rect x="7.4" y="7.4" width="8" height="8" rx="1" fill="currentColor" fill-opacity=".25"/></svg>',
+  back: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="7.4" y="7.4" width="8" height="8" rx="1" stroke-dasharray="2 2"/><rect x="2.6" y="2.6" width="8" height="8" rx="1" fill="currentColor" fill-opacity=".25"/></svg>',
+  kbd: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="4.2" width="14.4" height="9.6" rx="1.8"/><path d="M4.6 7.2h.01M7.4 7.2h.01M10.2 7.2h.01M13 7.2h.01M5.4 10.8h7.2"/></svg>',
   clear: '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg>',
 };
 
@@ -1545,8 +1980,13 @@ class DrawTools {
 
     cv.el.addEventListener('pointerdown', e => this._down(e), true);
     cv.el.addEventListener('contextmenu', e => this._ctxOpen(e));
+    // поле ввода текста открываем по click, а не по pointerdown: iOS показывает клавиатуру, только если
+    // фокус поставлен из «завершённого» жеста
+    cv.el.addEventListener('click', () => this._textPendingFire());
     window.addEventListener('pointermove', e => this._move(e));
     window.addEventListener('pointerup', e => this._up(e));
+    // браузер отобрал жест (на таче - под прокрутку): без этого перетаскивание «залипло» бы до следующего отпускания
+    window.addEventListener('pointercancel', e => this._up(e));
     window.addEventListener('keydown', e => this._hotkey(e));
   }
 
@@ -1554,66 +1994,62 @@ class DrawTools {
   _buildToolbar() {
     const bar = document.createElement('div');
     bar.className = 'draw-toolbar';
-    const groups = [
-      [['cursor', 'Курсор: выбрать, подвинуть, Cmd+клик — несколько', 'Esc']],
-      [['trend', 'Линия тренда (Shift — ровно)', 'Alt+T'],
-       ['hray', 'Горизонтальный луч (уровень вправо)', 'Alt+J'],
-       ['path', 'Траектория цены: клик за кликом, двойной клик — конец', 'Alt+A']],
-      [['ruler', 'Линейка (или Shift+протянуть)', 'Alt+M']],
-    ];
+    const A = DRAW_ALT;
     this.btns = {};
-    groups.forEach((group, gi) => {
-      if (gi) bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
-      for (const [id, label, key] of group) {
-        const b = document.createElement('button');
-        b.innerHTML = DRAW_ICONS[id];
-        b.title = `${label} · ${key}`;
-        b.addEventListener('click', () => this.setTool(id));
-        bar.appendChild(b);
-        this.btns[id] = b;
-      }
-    });
-
-    bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
-    this.magnetBtn = document.createElement('button');
-    this.magnetBtn.innerHTML = DRAW_ICONS.magnet;
-    this.magnetBtn.title = 'Магнит: привязка к свечам · Alt+S (Cmd при перетаскивании точки — временно наоборот)';
+    const sep = () => bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
+    const mk = (icon, title, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = DRAW_ICONS[icon];
+      b.title = title;
+      // после клика мышью фокус со значка снимаем: иначе Enter/Пробел потом нажмут его ещё раз
+      b.addEventListener('click', e => { fn(e); if (e.detail) b.blur(); });
+      bar.appendChild(b);
+      return b;
+    };
+    // инструмент: клик включает, долгое нажатие (или правый клик) открывает настройки
+    const tool = (id, label, key) => {
+      const b = mk(id, `${label} · ${key}` + (id === 'cursor' ? '' : ' · зажми значок — настройки'),
+                   () => { if (b._lp) { b._lp = false; return; } this.setTool(id); });
+      if (id !== 'cursor') this._longPress(b, () => this._formOpen(id, null, b));
+      this.btns[id] = b;
+      return b;
+    };
+    // Порядок важен: на компьютере панель в две колонки, пары идут по строкам без пустых клеток
+    tool('cursor', `Курсор: выбрать, подвинуть, ${DRAW_MOD}+клик — несколько`, 'Esc');
+    this.magnetBtn = mk('magnet', `Магнит: привязка к свечам · ${A}+S (${DRAW_MOD} при перетаскивании точки — временно наоборот)`, () => this.toggleMagnet());
     this.magnetBtn.classList.toggle('active', this.magnet);
-    this.magnetBtn.addEventListener('click', () => this.toggleMagnet());
-    bar.appendChild(this.magnetBtn);
-
-    bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
-    const del = document.createElement('button');
-    del.innerHTML = DRAW_ICONS.trash;
-    del.title = 'Удалить выделенное · Delete, Backspace или клик колесом мыши';
-    del.addEventListener('click', () => this._deleteSelected());
-    bar.appendChild(del);
-    const clear = document.createElement('button');
-    clear.innerHTML = DRAW_ICONS.clear;
-    clear.title = 'Стереть все рисунки на монете · Alt+Backspace';
-    clear.addEventListener('click', () => this.clearAll());
-    bar.appendChild(clear);
-
-    bar.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
-    const bell = document.createElement('button');
-    bell.innerHTML = DRAW_ICONS.bell;
-    bell.title = 'Оповещение о пробое цены';
-    bell.addEventListener('click', () => this.toggleAlerts());
-    bar.appendChild(bell);
-    this.bellBtn = bell;
-
-    const help = document.createElement('button');
-    help.innerHTML = DRAW_ICONS.help;
-    help.title = 'Горячие клавиши';
-    help.addEventListener('click', () => this.toggleHelp());
-    bar.appendChild(help);
-    this.helpBtn = help;
+    sep();
+    // оповещения и шпаргалка вверху: на телефоне панель прокручивается, и они не должны уехать вниз за края
+    this.bellBtn = mk('bell', 'Оповещение о пробое цены', () => this.toggleAlerts());
+    this.helpBtn = mk('help', 'Горячие клавиши', () => this.toggleHelp());
+    sep();
+    tool('trend', 'Линия тренда (Shift — ровно)', A + '+T');
+    tool('hray', 'Горизонтальный луч (уровень вправо)', A + '+J');
+    tool('vline', 'Вертикальная линия', A + '+V');
+    tool('cross', 'Перекрестие', A + '+C');
+    tool('rect', 'Прямоугольник (Shift — квадрат)', 'Shift+' + A + '+R');
+    tool('ellipse', 'Эллипс (Shift — круг)', 'без клавиши');
+    tool('fib', 'Фибо-уровни: два клика', A + '+F');
+    tool('path', 'Траектория цены: клик за кликом, двойной клик — конец', A + '+A');
+    tool('brush', 'Кисть: рисуй от руки', 'без клавиши');
+    tool('text', 'Текст: клик и печатай', 'без клавиши');
+    tool('ruler', 'Линейка (или Shift+протянуть)', A + '+M');
+    this.eyeBtn = mk('eye', `Спрятать / показать все рисунки · ${DRAW_MOD}+${A}+H`, () => this.toggleHidden());
+    sep();
+    mk('trash', 'Удалить выделенное · Delete, Backspace или клик колесом мыши', () => this._deleteSelected());
+    mk('clear', `Стереть все рисунки на монете · ${A}+Backspace`, () => this.clearAll());
 
     this.cv.el.appendChild(bar);
+    this.bar = bar;
     this.setTool('cursor');
   }
 
   setTool(id) {
+    // вернулись к курсору после рисунка: двойной клик, которым его закончили, не должен сбросить вид графика
+    if (this.tool !== 'cursor' && id === 'cursor') this._finishedAt = Date.now();
+    this._textClose(true);
+    this._formClose();
     this.tool = id;
     this.draft = null;
     for (const [k, b] of Object.entries(this.btns)) b.classList.toggle('active', k === id);
@@ -1632,28 +2068,39 @@ class DrawTools {
 
   /* Сдвинуть рисунок на dt/dp от его ТЕКУЩЕГО положения (стрелки, вставка). */
   _shift(it, dt, dp) {
-    if (it.type === 'hray') { it.t += dt; it.price += dp; return; }
-    if (it.type === 'path') { it.pts = it.pts.map(q => ({ t: q.t + dt, price: q.price + dp })); return; }
-    it.p1 = { t: it.p1.t + dt, price: it.p1.price + dp };
-    it.p2 = { t: it.p2.t + dt, price: it.p2.price + dp };
+    const k = DRAW_KIND[it.type];
+    if (k === 'one') { it.t += dt; it.price += dp; }
+    else if (k === 'time') it.t += dt;
+    else if (k === 'many') it.pts = it.pts.map(q => ({ t: q.t + dt, price: q.price + dp }));
+    else {
+      it.p1 = { t: it.p1.t + dt, price: it.p1.price + dp };
+      it.p2 = { t: it.p2.t + dt, price: it.p2.price + dp };
+    }
   }
 
   _anchorOf(it) {
-    if (it.type === 'hray') return { t: it.t, price: it.price };
-    if (it.type === 'path') return { t: it.pts[0].t, price: it.pts[0].price };
+    const k = DRAW_KIND[it.type];
+    if (k === 'one') return { t: it.t, price: it.price };
+    if (k === 'time') return { t: it.t, price: 0 };    // у вертикали цены нет, при вставке её сдвиг не применяется
+    if (k === 'many') return { t: it.pts[0].t, price: it.pts[0].price };
     return { t: it.p1.t, price: it.p1.price };
+  }
+
+  /* Сдвиг в единицах графика на dx/dy ЭКРАННЫХ пикселей (от середины поля):
+     одинаковый шаг на любом масштабе. */
+  _screenDelta(dx, dy) {
+    const ts = this.cv.chart.timeScale();
+    const rx = this.cv._paneW() / 2, ry = this.cv._paneH() / 2;
+    const l0 = ts.coordinateToLogical(rx), l1 = ts.coordinateToLogical(rx + dx);
+    const p0 = this.cv.series.coordinateToPrice(ry), p1 = this.cv.series.coordinateToPrice(ry + dy);
+    return { dt: (l0 != null && l1 != null) ? (l1 - l0) * this._iv() : 0, dp: (p0 != null && p1 != null) ? p1 - p0 : 0 };
   }
 
   /* Стрелки двигают выделенное на dx/dy ЭКРАННЫХ пикселей — как в TradingView,
      то есть шаг одинаковый на любом масштабе. */
   _nudge(dx, dy) {
     if (!this.sel.length || !this.cv.candles) return;
-    const ts = this.cv.chart.timeScale();
-    const rx = this.cv._paneW() / 2, ry = this.cv._paneH() / 2;
-    const l0 = ts.coordinateToLogical(rx), l1 = ts.coordinateToLogical(rx + dx);
-    const p0 = this.cv.series.coordinateToPrice(ry), p1 = this.cv.series.coordinateToPrice(ry + dy);
-    const dt = (l0 != null && l1 != null) ? (l1 - l0) * this._iv() : 0;
-    const dp = (p0 != null && p1 != null) ? p1 - p0 : 0;
+    const { dt, dp } = this._screenDelta(dx, dy);
     if (!dt && !dp) return;
     this._pushHistory();
     for (const i of this.sel) if (this.items[i]) this._shift(this.items[i], dt, dp);
@@ -1671,7 +2118,9 @@ class DrawTools {
   pasteClip() {
     if (!DRAW_CLIP.length) { this._toast('Буфер пуст'); return; }
     this._pushHistory();
-    const base = this._anchorOf(DRAW_CLIP[0]);
+    // опорная точка - первый рисунок, у которого есть цена (у вертикали её нет)
+    const ref = DRAW_CLIP.find(i => DRAW_KIND[i.type] !== 'time') || DRAW_CLIP[0];
+    const base = this._anchorOf(ref);
     const to = this._lastPt || base;   // вставляем туда, где курсор
     const dt = to.t - base.t, dp = to.price - base.price;
     this.sel = [];
@@ -1687,9 +2136,13 @@ class DrawTools {
   }
 
   // Cmd+Alt+H — спрятать/показать всю разметку сразу на всех таймфреймах
-  toggleHidden() {
-    const v = !this.hidden;
-    for (const o of DRAW_BUS) { o.hidden = v; o.cv.requestDraw(); }
+  toggleHidden(force) {
+    const v = force == null ? !this.hidden : force;
+    for (const o of DRAW_BUS) {
+      o.hidden = v;
+      if (o.eyeBtn) o.eyeBtn.classList.toggle('active', v);
+      o.cv.requestDraw();
+    }
     this._toast(v ? 'Рисунки скрыты' : 'Рисунки показаны');
   }
 
@@ -1697,32 +2150,46 @@ class DrawTools {
 
   _ctxOpen(e) {
     // на панелях и кнопках оставляем обычное меню браузера
-    if (e.target.closest('.draw-toolbar') || e.target.closest('.draw-help') || e.target.closest('.chart-reset')) return;
+    if (e.target.closest(DRAW_UI_SEL)) return;
     if (!this.cv.candles) return;
     const { x, y } = this._xy(e);
     if (!this._inPane(x, y)) return;
     const price = this.cv.series.coordinateToPrice(y);
     if (price == null || !(price > 0)) return;
     e.preventDefault();
+    this._textClose(true);
+    this._formClose();
 
+    // правый клик по рисунку - меню самого рисунка, по пустому месту - меню цены
+    const hit = this.tool === 'cursor' ? this._hitTest(x, y) : null;
+    if (hit) {
+      this.sel = [hit.i];
+      this.drag = null;
+      this.cv.requestDraw();
+      this._itemMenu(hit.i, x, y);
+      return;
+    }
+    this._ctxShow(x, y, this._fmt(price), [
+      { icon: 'bell', label: 'Оповещение на этой цене', fn: () => this._sendAlert(price) },
+      { icon: 'hray', label: 'Горизонтальный луч здесь', fn: () => this._ctxAddRay(price) },
+      { icon: 'copy', label: 'Скопировать цену', fn: () => this._ctxCopy(price) },
+    ]);
+  }
+
+  /* Одно меню на график, содержимое собирается заново: rows = [{icon, label, fn, danger?} | {sep:true}].
+     Позиция - x/y внутри графика, меню не вылезает за край. */
+  _ctxShow(x, y, head, rows) {
     if (!this.ctxEl) {
       const box = document.createElement('div');
       box.className = 'chart-ctx';
       box.hidden = true;
-      box.innerHTML =
-        '<div class="cx-price"></div>' +
-        `<button type="button" data-act="alert">${DRAW_ICONS.bell}<span>Оповещение на этой цене</span></button>` +
-        `<button type="button" data-act="hray">${DRAW_ICONS.hray}<span>Горизонтальный луч здесь</span></button>` +
-        `<button type="button" data-act="copy">${DRAW_ICONS.copy}<span>Скопировать цену</span></button>`;
       box.addEventListener('pointerdown', ev => ev.stopPropagation());
       box.addEventListener('click', ev => {
-        const b = ev.target.closest('[data-act]');
+        const b = ev.target.closest('[data-i]');
         if (!b) return;
-        const pr = this._ctxPrice;
+        const row = this._ctxRows[+b.dataset.i];
         this._ctxClose();
-        if (b.dataset.act === 'alert') this._sendAlert(pr);
-        else if (b.dataset.act === 'hray') this._ctxAddRay(pr);
-        else this._ctxCopy(pr);
+        if (row && row.fn) row.fn();
       });
       this.cv.el.appendChild(box);
       this.ctxEl = box;
@@ -1735,10 +2202,11 @@ class DrawTools {
       }, true);
       this.cv.el.addEventListener('wheel', () => this._ctxClose(), { passive: true });
     }
-
-    this._ctxPrice = price;
+    this._ctxRows = rows;
     const box = this.ctxEl;
-    box.querySelector('.cx-price').textContent = this._fmt(price);
+    box.innerHTML = `<div class="cx-price">${head}</div>` + rows.map((r, i) => r.sep
+      ? '<div class="cx-sep"></div>'
+      : `<button type="button" data-i="${i}"${r.danger ? ' class="danger"' : ''}>${DRAW_ICONS[r.icon] || ''}<span>${r.label}</span></button>`).join('');
     box.hidden = false;
     // держим меню внутри графика, а не за краем
     const w = box.offsetWidth, h = box.offsetHeight;
@@ -1757,7 +2225,7 @@ class DrawTools {
     // луч начинаем от левого края видимой области — так он виден целиком
     const lr = this.cv.chart.timeScale().getVisibleLogicalRange();
     const t = this._l2t(lr ? Math.max(0, lr.from) : 0);
-    this.items.push({ type: 'hray', t, price });
+    this.items.push(this._newItem('hray', { t, price }));
     this.sel = [this.items.length - 1];
     this._save();
     this.cv.requestDraw();
@@ -1872,11 +2340,11 @@ class DrawTools {
     if (!inp.value && last && document.activeElement !== inp) inp.value = f(last);
     this._alertDir();
     // уровни, которые уже нарисованы горизонтальным лучом на этой монете
-    const lv = this.items.filter(i => i.type === 'hray').map(i => i.price).sort((a, b) => b - a);
+    const lv = this.items.filter(i => i.type === 'hray' || i.type === 'cross').map(i => i.price).sort((a, b) => b - a);
     box.querySelector('.al-levels').innerHTML = lv.length
       ? '<div class="al-cap">Уровни с графика</div>' + lv.map(pr =>
           `<button type="button" class="al-lv" data-price="${pr}">${f(pr)} <i>${pr > last ? 'вверх ↑' : 'вниз ↓'}</i></button>`).join('')
-      : '<div class="al-cap dim">Нарисуй горизонтальный луч (Alt+J) — уровень появится здесь кнопкой</div>';
+      : '<div class="al-cap dim">Нарисуй горизонтальный луч (' + DRAW_ALT + '+J) — уровень появится здесь кнопкой</div>';
   }
 
   _alertDir() {
@@ -1899,14 +2367,20 @@ class DrawTools {
       const box = document.createElement('div');
       box.className = 'draw-help';
       box.hidden = true;
-      const keys = ks => ks.map(k => `<kbd>${k}</kbd>`).join('<i>+</i>');
       box.innerHTML =
         '<div class="dh-head"><b>Горячие клавиши</b><button type="button" class="dh-x" title="Закрыть · Esc">×</button></div>' +
         DRAW_HELP.map(([title, rows]) =>
           `<div class="dh-group">${title}</div>` +
-          rows.map(([label, ks]) => `<div class="dh-row"><span>${label}</span><span class="dh-keys">${keys(ks)}</span></div>`).join('')
-        ).join('');
+          rows.map(([label, ks, tag]) =>
+            `<div class="dh-row"><span>${label}${tag === 'tv' ? '<em class="dh-tv" title="Как в TradingView">TV</em>' : ''}</span>` +
+            `<span class="dh-keys">${drawKeysHtml(ks)}</span></div>`).join('')
+        ).join('') +
+        '<button type="button" class="dh-open">Открыть вкладкой: все клавиши, поиск и проверка</button>';
       box.querySelector('.dh-x').addEventListener('click', () => this.toggleHelp(false));
+      box.querySelector('.dh-open').addEventListener('click', () => {
+        this.toggleHelp(false);
+        if (typeof Keys !== 'undefined') Keys.show(true);
+      });
       // клик внутри шпаргалки не должен доходить до графика
       box.addEventListener('pointerdown', e => e.stopPropagation());
       this.cv.el.appendChild(box);
@@ -1925,7 +2399,7 @@ class DrawTools {
     this.ruler = null;
     this._save();
     this.cv.requestDraw();
-    this._toast('Рисунки удалены · Cmd+Z вернёт');
+    this._toast('Рисунки удалены · ' + DRAW_MOD + '+Z вернёт');
   }
 
   // короткая подсказка в углу графика
@@ -1960,15 +2434,19 @@ class DrawTools {
   /* ---------- горячие клавиши (раскладка TradingView) ---------- */
   _hotkey(e) {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
-    if (!this.cv.el.offsetParent) return;  // только видимая вкладка
+    if (e.isComposing) return;                                    // набор через IME - не наши клавиши
+    if (typeof Keys !== 'undefined' && Keys.isOpen()) return;     // на вкладке «Клавиши» график не трогаем
+    if (!this.cv.el.offsetParent) return;                         // только видимая вкладка
 
-    const code = e.code;  // раскладка-независимо: KeyT работает и на русской
+    const code = e.code;  // раскладка-независимо: KeyT работает и на русской. На маке Option+буква
+                          // печатает другой символ (e.key), но e.code остаётся KeyT
     const mod = e.metaKey || e.ctrlKey;
 
-    if (mod && code === 'KeyZ') { e.preventDefault(); this.undo(); return; }
+    if (mod && !e.altKey && code === 'KeyZ') { e.preventDefault(); this.undo(); return; }
     if (mod && e.altKey && code === 'KeyH') { e.preventDefault(); this.toggleHidden(); return; }
-    if (mod && code === 'KeyC') { e.preventDefault(); this.copySel(); return; }
-    if (mod && code === 'KeyV') { e.preventDefault(); this.pasteClip(); return; }
+    // Cmd+Option+C/V не трогаем: у браузера там инструменты разработчика
+    if (mod && !e.altKey && code === 'KeyC') { e.preventDefault(); this.copySel(); return; }
+    if (mod && !e.altKey && code === 'KeyV') { e.preventDefault(); this.pasteClip(); return; }
 
     // стрелки двигают выделенное; с Shift — крупным шагом
     const ARROW = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -1980,15 +2458,16 @@ class DrawTools {
     }
 
     if (e.altKey && !mod) {
-      // Alt+J — горизонтальный луч, как в TradingView; Alt+H оставлен привычным алиасом
-      const map = { KeyT: 'trend', KeyJ: 'hray', KeyH: 'hray', KeyA: 'path', KeyM: 'ruler' };
-      if (map[code]) {
+      const hk = DRAW_HOTKEYS.find(h => h.code === code && !!h.shift === e.shiftKey);
+      if (hk) {
         e.preventDefault();
-        this.setTool(map[code]);
-        this._toast(this.btns[map[code]].title.split(' · ')[0]);
+        this.setTool(hk.tool);
+        this._toast(this.btns[hk.tool].title.split(' · ')[0]);
         return;
       }
-      if (code === 'KeyS') { e.preventDefault(); this.toggleMagnet(); return; }
+      // запасное сочетание для «спрятать разметку»: Cmd+Option+H в macOS ещё и «Скрыть остальные»
+      if (code === 'KeyH' && e.shiftKey) { e.preventDefault(); this.toggleHidden(); return; }
+      if (code === 'KeyS' && !e.shiftKey) { e.preventDefault(); this.toggleMagnet(); return; }
       if (code === 'Backspace' || code === 'Delete') { e.preventDefault(); this.clearAll(); return; }
       return;
     }
@@ -2000,6 +2479,7 @@ class DrawTools {
     }
     if (code === 'Escape') {
       e.preventDefault();
+      if (this.formEl) { this._formClose(); return; }
       if (this.helpEl && !this.helpEl.hidden) { this.toggleHelp(false); return; }
       if (this.ctxEl && !this.ctxEl.hidden) { this._ctxClose(); return; }
       if (this.alertEl && !this.alertEl.hidden) { this.toggleAlerts(false); return; }
@@ -2023,6 +2503,9 @@ class DrawTools {
     // монеты — в поле попала бы её цена. Просто чистим, а обновит таймер панели,
     // когда данные новой монеты уже приедут.
     if (this.alertEl) this.alertEl.querySelector('.al-price').value = '';
+    this._textClose(false);
+    this._formClose();
+    this._ctxClose();
     this.items = this._load(sym);
     this.sel = [];
     this.draft = null;
@@ -2038,9 +2521,24 @@ class DrawTools {
       return arr
         // старые стрелки из двух точек — это та же траектория, не теряем их
         .map(i => (i.type === 'arrow' && i.p1 && i.p2) ? { type: 'path', pts: [i.p1, i.p2] } : i)
-        .filter(i => DRAW_TYPES.includes(i.type) && (i.type !== 'path' || (i.pts && i.pts.length >= 2)));
+        .filter(i => i && DRAW_TYPES.includes(i.type) && this._valid(i));
     } catch (e) { return []; }
   }
+
+  // битый рисунок (нет точек, нет текста) лучше выбросить, чем уронить отрисовку
+  _valid(i) {
+    const num = v => typeof v === 'number' && isFinite(v);
+    const pt = p => p && num(p.t) && num(p.price);
+    const k = DRAW_KIND[i.type];
+    if (i.type === 'text') return num(i.t) && num(i.price) && typeof i.txt === 'string' && i.txt !== '';
+    if (k === 'one') return num(i.t) && num(i.price);
+    if (k === 'time') return num(i.t);
+    if (k === 'many') return Array.isArray(i.pts) && i.pts.length >= 2 && i.pts.every(pt);
+    return pt(i.p1) && pt(i.p2);
+  }
+
+  // новый рисунок: геометрия + стиль (заводской или из настроек инструмента)
+  _newItem(type, geom) { return Object.assign({ type }, geom, drawStyleFor(type)); }
 
   _save() {
     if (!this.symbol) return;
@@ -2148,10 +2646,13 @@ class DrawTools {
 
   /* ---------- события ---------- */
   _down(e) {
-    if (e.target.closest('.draw-toolbar') || e.target.closest('.chart-reset')
-        || e.target.closest('.draw-help')) return;   // .draw-alerts тоже имеет класс .draw-help
+    if (e.target.closest(DRAW_UI_SEL)) return;   // панель, шпаргалка, меню, плавающая панель рисунка
     if (!this.cv.candles) return;
+    // Ctrl+клик на маке система превращает в правый клик: пусть отработает меню (contextmenu)
+    if (IS_MAC && e.ctrlKey && e.button === 0) return;
     const { x, y } = this._xy(e);
+    this._textClose(true);   // печатали текст и кликнули мимо - фиксируем
+    this._formClose();
     // клик колесом мыши удаляет рисунок под курсором (как в TradingView)
     if (e.button === 1) {
       if (!this._inPane(x, y)) return;
@@ -2175,7 +2676,7 @@ class DrawTools {
     // Shift+протянуть при курсоре — быстрая линейка (как в TradingView)
     if (this.tool === 'cursor' && e.shiftKey) {
       this.ruler = null;
-      this.draft = { type: 'ruler', p1: pt, p2: pt };
+      this.draft = { type: 'ruler', p1: pt, p2: pt, sx: x, sy: y, down: true, quick: true };
       e.preventDefault();
       e.stopPropagation();
       this.cv.requestDraw();
@@ -2186,7 +2687,7 @@ class DrawTools {
 
     if (this.tool === 'cursor') {
       const hit = this._hitTest(x, y);
-      const cmd = e.metaKey || e.ctrlKey;
+      const cmd = modKey(e);
       if (hit) {
         this._pushHistory();  // перемещение тоже отменяется по Cmd+Z
         // Cmd без движения = добавить в выделение, Cmd + тянуть = клонировать.
@@ -2210,15 +2711,25 @@ class DrawTools {
 
     e.preventDefault();
     e.stopPropagation();
+    if (this.hidden) this.toggleHidden(false);   // рисуем поверх спрятанного - разметка возвращается (как в TradingView)
+
+    const T = this.tool, d = this.draft;
+
+    // «клик — клик»: первый клик поставил начало, этот - конец
+    if (d && d.sticky && d.type === T) {
+      d.p2 = this._endPoint(d, e, x, y, pt);
+      this._commitDraft();
+      return;
+    }
 
     // Траектория: ставится точка за точкой. Последняя точка в draft.pts — «резинка»,
     // она едет за курсором. Клик по предыдущей точке (в т.ч. второй клик двойного)
     // заканчивает рисунок.
-    if (this.tool === 'path') {
-      if (!this.draft) {
+    if (T === 'path') {
+      if (!d) {
         this.draft = { type: 'path', pts: [pt, { t: pt.t, price: pt.price }] };
       } else {
-        const pts = this.draft.pts;
+        const pts = d.pts;
         const prev = pts[pts.length - 2];
         if (prev && this._nearPoint(prev, x, y)) this._finishPath();
         else { pts[pts.length - 1] = pt; pts.push({ t: pt.t, price: pt.price }); }
@@ -2227,17 +2738,38 @@ class DrawTools {
       return;
     }
 
-    if (this.tool === 'hray') {
+    if (T === 'hray' || T === 'vline' || T === 'cross') {
       this._pushHistory();
-      this.items.push({ type: 'hray', t: pt.t, price: pt.price });
+      this.items.push(this._newItem(T, T === 'vline' ? { t: pt.t } : { t: pt.t, price: pt.price }));
       this.sel = [this.items.length - 1];
       this._save();
       this.setTool('cursor');
-    } else if (this.tool === 'trend' || this.tool === 'ruler') {
+    } else if (T === 'text') {
+      this._textPending({ t: pt.t, price: pt.price });
+    } else if (T === 'brush') {
+      // кисть рисует по курсору как есть, без магнита
+      this.draft = { type: 'brush', pts: [this._pt(x, y, false) || pt], lx: x, ly: y, down: true };
+    } else {
       // sx/sy — экранная точка нажатия: по ней считаем направление при Shift
-      this.draft = { type: this.tool, p1: pt, p2: pt, sx: x, sy: y };
+      this.draft = { type: T, p1: pt, p2: pt, sx: x, sy: y, down: true };
     }
     this.cv.requestDraw();
+  }
+
+  // конец рисунка под курсором; Shift: ровная линия (горизонт/вертикаль/45°) или квадрат/круг
+  _endPoint(d, e, cx, cy, pt) {
+    if (!e.shiftKey || d.type === 'ruler') return pt;
+    if (d.type === 'rect' || d.type === 'ellipse') return this._square(d.p1, cx, cy) || pt;
+    return this._constrain(d.p1, cx, cy, d.sx, d.sy) || pt;
+  }
+
+  // точка так, чтобы прямоугольник от from получился квадратом (по ЭКРАННЫМ пикселям)
+  _square(from, x, y) {
+    const m = this._screen();
+    const x0 = m.X(from.t), y0 = m.yOf(from.price);
+    if (y0 == null) return null;
+    const dx = x - x0, dy = y - y0, s = Math.max(Math.abs(dx), Math.abs(dy));
+    return this._pt(x0 + (dx < 0 ? -s : s), y0 + (dy < 0 ? -s : s), false);
   }
 
   _move(e) {
@@ -2249,7 +2781,7 @@ class DrawTools {
     if (!pt) return;
 
     this._lastPt = pt;              // куда вставлять по Cmd+V
-    this._cmd = e.metaKey || e.ctrlKey;
+    this._cmd = modKey(e);
 
     if (this.drag) {
       if (!this.drag.moved && Math.hypot(x - this.drag.x0, y - this.drag.y0) > 3) {
@@ -2267,6 +2799,7 @@ class DrawTools {
       }
       const it = this.items[this.drag.i];
       const o = this.drag.orig;
+      const h = this.drag.handle;
       const l0 = this.cv.chart.timeScale().coordinateToLogical(this.drag.x0);
       const l1 = this.cv.chart.timeScale().coordinateToLogical(x);
       let dt = (l0 != null && l1 != null) ? (l1 - l0) * this._iv() : 0;
@@ -2274,16 +2807,18 @@ class DrawTools {
       let dp = p0 != null ? pt.price - p0 : 0;
       let dragPt = pt;
       if (e.shiftKey) {
-        const hp = /^p(\d+)$/.exec(this.drag.handle || '');
-        if (o.pts && hp) {
+        const hp = /^p(\d+)$/.exec(h || '');
+        const two = DRAW_KIND[it.type] === 'two';
+        if (it.type === 'path' && hp) {
           // точка траектории — выравниваем относительно соседнего колена
           const k = +hp[1], anchor = o.pts[k - 1] || o.pts[k + 1];
           if (anchor) dragPt = this._constrain(anchor, cx, cy, this.drag.x0, this.drag.y0) || pt;
-        } else if (this.drag.handle === 'p1' || this.drag.handle === 'p2') {
-          // тянем конец линии — выравниваем относительно противоположной точки
-          const anchor = this.drag.handle === 'p1' ? o.p2 : o.p1;
-          if (anchor) dragPt = this._constrain(anchor, cx, cy, this.drag.x0, this.drag.y0) || pt;
-        } else {
+        } else if (two && (h === 'p1' || h === 'p2')) {
+          // тянем конец линии — выравниваем относительно противоположной точки; у рамок - квадрат
+          const anchor = h === 'p1' ? o.p2 : o.p1;
+          if (it.type === 'rect' || it.type === 'ellipse') dragPt = this._square(anchor, cx, cy) || pt;
+          else dragPt = this._constrain(anchor, cx, cy, this.drag.x0, this.drag.y0) || pt;
+        } else if (!(two && (h === 'p3' || h === 'p4'))) {
           // двигаем рисунок целиком — только по одной оси
           if (Math.abs(cx - this.drag.x0) >= Math.abs(cy - this.drag.y0)) dp = 0;
           else dt = 0;
@@ -2294,23 +2829,26 @@ class DrawTools {
           if (this.items[i]) this._applyDrag(this.items[i], oi, 'body', dt, dp, dragPt);
         }
       } else {
-        this._applyDrag(it, o, this.drag.handle, dt, dp, dragPt);
+        this._applyDrag(it, o, h, dt, dp, dragPt);
       }
       this.cv.requestDraw();
       return;
     }
-    if (this.draft) {
-      if (this.draft.type === 'path') {
+    const d = this.draft;
+    if (d) {
+      if (d.type === 'path') {
         // тянем последнее колено от предыдущей точки; Shift — ровно
-        const pts = this.draft.pts, prev = pts[pts.length - 2];
+        const pts = d.pts, prev = pts[pts.length - 2];
         pts[pts.length - 1] = (e.shiftKey && prev) ? (this._constrain(prev, cx, cy) || pt) : pt;
-        this.cv.requestDraw();
-        return;
+      } else if (d.type === 'brush') {
+        // точки чаще 2.5 пикселей не нужны: линия и так гладкая, а рисунок не раздувается
+        if (Math.hypot(cx - d.lx, cy - d.ly) >= 2.5) {
+          const p = this._pt(cx, cy, false);
+          if (p) { d.pts.push(p); d.lx = cx; d.ly = cy; }
+        }
+      } else {
+        d.p2 = this._endPoint(d, e, cx, cy, pt);
       }
-      // Shift во время рисования — ровная линия (горизонт/вертикаль/45°)
-      this.draft.p2 = (e.shiftKey && this.draft.type !== 'ruler')
-        ? (this._constrain(this.draft.p1, cx, cy, this.draft.sx, this.draft.sy) || pt)
-        : pt;
       this.cv.requestDraw();
     }
   }
@@ -2337,7 +2875,7 @@ class DrawTools {
     }
     if (pts.length >= 2) {
       this._pushHistory();
-      this.items.push({ type: 'path', pts });
+      this.items.push(this._newItem('path', { pts }));
       this.sel = [this.items.length - 1];
       this._save();
     }
@@ -2345,12 +2883,47 @@ class DrawTools {
     this.cv.requestDraw();
   }
 
+  // Рисунок из двух точек готов: кладём в список (линейка - отдельно, она не сохраняется)
+  _commitDraft() {
+    const d = this.draft;
+    if (!d) return;
+    this.draft = null;
+    this._finishedAt = Date.now();
+    const moved = d.p2.t !== d.p1.t || d.p2.price !== d.p1.price;
+    if (d.type === 'ruler') {
+      if (moved) this.ruler = { p1: d.p1, p2: d.p2 };
+    } else if (moved) {
+      this._pushHistory();
+      this.items.push(this._newItem(d.type, { p1: d.p1, p2: d.p2 }));
+      this.sel = [this.items.length - 1];
+      this._save();
+    } else {
+      this.cv.requestDraw();
+      return;
+    }
+    this.setTool('cursor');
+  }
+
+  // Кисть: отпустили - штрих готов. Одиночное касание без движения ничего не рисует.
+  _finishBrush() {
+    const d = this.draft;
+    if (!d || d.type !== 'brush') return;
+    this.draft = null;
+    if (d.pts.length < 2) { this.cv.requestDraw(); return; }
+    this._finishedAt = Date.now();
+    this._pushHistory();
+    this.items.push(this._newItem('brush', { pts: d.pts }));
+    this.sel = [this.items.length - 1];
+    this._save();
+    this.setTool('cursor');
+  }
+
   // двойной клик по графику возвращает вид к цене — пока рисуем, это мешает
   blocksDblClick() {
     return this.tool !== 'cursor' || !!this.draft || Date.now() - (this._finishedAt || 0) < 500;
   }
 
-  _up() {
+  _up(e) {
     if (this.drag) {
       const d = this.drag;
       this.drag = null;
@@ -2366,45 +2939,47 @@ class DrawTools {
         return;
       }
       this._save();
+      this.cv.requestDraw();
       return;
     }
     const d = this.draft;
     if (!d) return;
     if (d.type === 'path') return;  // траектория живёт до двойного клика / Enter, а не до отпускания
-    const moved = Math.abs(d.p2.t - d.p1.t) > 0 || Math.abs(d.p2.price - d.p1.price) > 0;
-    if (d.type === 'ruler') {
-      if (moved) this.ruler = { p1: d.p1, p2: d.p2 };
-      this.draft = null;
-      this.setTool('cursor');
-    } else if (moved) {
-      this._pushHistory();
-      this.items.push({ type: d.type, p1: d.p1, p2: d.p2 });
-      this.sel = [this.items.length - 1];
-      this._save();
-      this.draft = null;
-      this.setTool('cursor');
-    } else {
-      this.draft = null;
-    }
+    if (d.type === 'brush') { this._finishBrush(); return; }
+    if (!d.down) return;            // «клик — клик»: начало уже стоит, ждём второго клика
+    const p = e && e.clientX != null ? this._xy(e) : { x: d.sx, y: d.sy };
+    if (Math.hypot(p.x - d.sx, p.y - d.sy) > 4) { this._commitDraft(); return; }   // протянули - готово
+    if (d.quick) { this.draft = null; this.cv.requestDraw(); return; }             // быстрая линейка без протяжки - отмена
+    // клик без протягивания: остаёмся «в рисунке», конец поставит следующий клик
+    d.down = false;
+    d.sticky = true;
     this.cv.requestDraw();
   }
 
   _applyDrag(it, o, handle, dt, dp, pt) {
-    if (it.type === 'hray') {
+    const k = DRAW_KIND[it.type];
+    if (k === 'one') {
       if (handle === 'p1') { it.t = pt.t; it.price = pt.price; }
       else { it.t = o.t + dt; it.price = o.price + dp; }
       return;
     }
-    if (it.type === 'path') {
-      const hp = /^p(\d+)$/.exec(handle || '');
+    if (k === 'time') { it.t = o.t + dt; return; }
+    if (k === 'many') {
+      const hp = it.type === 'path' && /^p(\d+)$/.exec(handle || '');
       if (hp) it.pts[+hp[1]] = { t: pt.t, price: pt.price };
       else it.pts = o.pts.map(p => ({ t: p.t + dt, price: p.price + dp }));
       return;
     }
-    // trend
+    // две точки: линия, рамка, эллипс, фибо. p3/p4 - два других угла рамки
     if (handle === 'p1') { it.p1 = { t: pt.t, price: pt.price }; }
     else if (handle === 'p2') { it.p2 = { t: pt.t, price: pt.price }; }
-    else {
+    else if (handle === 'p3') {   // угол (p1.t, p2.price)
+      it.p1 = { t: pt.t, price: o.p1.price };
+      it.p2 = { t: o.p2.t, price: pt.price };
+    } else if (handle === 'p4') { // угол (p2.t, p1.price)
+      it.p2 = { t: pt.t, price: o.p2.price };
+      it.p1 = { t: o.p1.t, price: pt.price };
+    } else {
       it.p1 = { t: o.p1.t + dt, price: o.p1.price + dp };
       it.p2 = { t: o.p2.t + dt, price: o.p2.price + dp };
     }
@@ -2430,33 +3005,115 @@ class DrawTools {
     const m = this._screen();
     if (!m.xOf) return null;
     const paneW = this.cv._paneW();
-    const R = 7;
-    for (let i = this.items.length - 1; i >= 0; i--) {
+    // ручки уже выделенного рисунка важнее тела других: иначе рамка поверх закрыла бы их
+    for (const i of this.sel) {
       const it = this.items[i];
-      if (it.type === 'hray') {
+      const h = it && this._hitOne(it, i, x, y, m, paneW);
+      if (h && h.handle !== 'body') return h;
+    }
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const h = this._hitOne(this.items[i], i, x, y, m, paneW);
+      if (h) return h;
+    }
+    return null;
+  }
+
+  // попадание курсора в один рисунок: { i, handle } (handle: p1, p2, p3, p4, pN, body) или null
+  _hitOne(it, i, x, y, m, paneW) {
+    const R = 7;
+    const near = (px, py) => Math.hypot(x - px, y - py) < R;
+    switch (it.type) {
+      case 'hray': {
         const yy = m.yOf(it.price), x0 = m.X(it.t);
-        if (yy == null) continue;
-        if (Math.hypot(x - x0, y - yy) < R) return { i, handle: 'p1' };
-        if (Math.abs(y - yy) < R && x >= x0 - R) return { i, handle: 'body' };
-      } else if (it.type === 'path') {
+        if (yy == null) return null;
+        if (near(x0, yy)) return { i, handle: 'p1' };
+        return (Math.abs(y - yy) < R && x >= x0 - R) ? { i, handle: 'body' } : null;
+      }
+      case 'vline':
+        return Math.abs(x - m.X(it.t)) < R ? { i, handle: 'body' } : null;
+      case 'cross': {
+        const x0 = m.X(it.t), yy = m.yOf(it.price);
+        if (yy == null) return null;
+        if (near(x0, yy)) return { i, handle: 'p1' };
+        return (Math.abs(x - x0) < R || Math.abs(y - yy) < R) ? { i, handle: 'body' } : null;
+      }
+      case 'text': {
+        const b = this._textBox(it, m);
+        return b && x >= b.l - 4 && x <= b.r + 4 && y >= b.t - 4 && y <= b.b + 4 ? { i, handle: 'body' } : null;
+      }
+      case 'path': {
         const pts = it.pts.map(p => [m.X(p.t), m.yOf(p.price)]);
-        if (pts.some(p => p[1] == null)) continue;
-        for (let k = 0; k < pts.length; k++) {
-          if (Math.hypot(x - pts[k][0], y - pts[k][1]) < R) return { i, handle: 'p' + k };
-        }
+        if (pts.some(p => p[1] == null)) return null;
+        for (let k = 0; k < pts.length; k++) if (near(pts[k][0], pts[k][1])) return { i, handle: 'p' + k };
         for (let k = 1; k < pts.length; k++) {
           if (this._distSeg(x, y, pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1]) < R) return { i, handle: 'body' };
         }
-      } else {
+        return null;
+      }
+      case 'brush': {
+        const pts = it.pts.map(p => [m.X(p.t), m.yOf(p.price)]);
+        if (pts.some(p => p[1] == null)) return null;
+        for (let k = 1; k < pts.length; k++) {
+          if (this._distSeg(x, y, pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1]) < R - 1) return { i, handle: 'body' };
+        }
+        return null;
+      }
+      case 'rect':
+      case 'ellipse': {
+        const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price), x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
+        if (y1 == null || y2 == null) return null;
+        const corners = { p1: [x1, y1], p2: [x2, y2], p3: [x1, y2], p4: [x2, y1] };
+        for (const [h, [px, py]] of Object.entries(corners)) if (near(px, py)) return { i, handle: h };
+        const l = Math.min(x1, x2), r = Math.max(x1, x2), t = Math.min(y1, y2), b = Math.max(y1, y2);
+        // внутри пустой рамки график можно тянуть; внутри залитой или выделенной - берём рисунок
+        const inside = this._isSel(i) || (it.fa || 0) > 0;
+        if (it.type === 'rect') {
+          if (x < l - R || x > r + R || y < t - R || y > b + R) return null;
+          if (Math.abs(x - l) < R || Math.abs(x - r) < R || Math.abs(y - t) < R || Math.abs(y - b) < R) return { i, handle: 'body' };
+          return inside && x > l && x < r && y > t && y < b ? { i, handle: 'body' } : null;
+        }
+        const rx = Math.max((r - l) / 2, 1), ry = Math.max((b - t) / 2, 1);
+        const d = Math.hypot((x - (l + r) / 2) / rx, (y - (t + b) / 2) / ry);
+        if (Math.abs(d - 1) * Math.min(rx, ry) < R) return { i, handle: 'body' };
+        return inside && d < 1 ? { i, handle: 'body' } : null;
+      }
+      case 'fib': {
+        const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price), x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
+        if (y1 == null || y2 == null) return null;
+        if (near(x1, y1)) return { i, handle: 'p1' };
+        if (near(x2, y2)) return { i, handle: 'p2' };
+        if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
+        const xl = Math.min(x1, x2) - R, xr = (it.ext ? paneW : Math.max(x1, x2)) + R;
+        if (x >= xl && x <= xr) {
+          for (const lv of this._fibLevels(it, m)) if (lv.y != null && Math.abs(y - lv.y) < R) return { i, handle: 'body' };
+        }
+        return null;
+      }
+      default: {  // trend
         const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
         const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
-        if (y1 == null || y2 == null) continue;
-        if (Math.hypot(x - x1, y - y1) < R) return { i, handle: 'p1' };
-        if (Math.hypot(x - x2, y - y2) < R) return { i, handle: 'p2' };
-        if (this._distSeg(x, y, x1, y1, x2, y2) < R) return { i, handle: 'body' };
+        if (y1 == null || y2 == null) return null;
+        if (near(x1, y1)) return { i, handle: 'p1' };
+        if (near(x2, y2)) return { i, handle: 'p2' };
+        return this._distSeg(x, y, x1, y1, x2, y2) < R ? { i, handle: 'body' } : null;
       }
     }
-    return null;
+  }
+
+  // уровни фибо, по возрастанию: { lv, price, y }. 0 - конец рисунка (p2), 1 - начало (p1), как в TradingView
+  _fibLevels(it, m) {
+    const lv = (it.lv && it.lv.length ? it.lv : FIB_LEVELS0).slice().sort((a, b) => a - b);
+    const a = it.p2.price, b = it.p1.price;
+    return lv.map(l => { const price = a + (b - a) * l; return { lv: l, price, y: m ? m.yOf(price) : null }; });
+  }
+
+  // рамка текста на экране; якорь (t, price) - левый край и середина по высоте
+  _textBox(it, m) {
+    const x0 = m.X(it.t), yy = m.yOf(it.price);
+    if (yy == null) return null;
+    const sz = it.sz || TEXT_SIZES[1], cx = drawMeasure();
+    cx.font = drawFont(sz);
+    return { l: x0, r: x0 + cx.measureText(it.txt).width, t: yy - sz * 0.65, b: yy + sz * 0.65 };
   }
 
   /* ---------- отрисовка ---------- */
@@ -2468,7 +3125,14 @@ class DrawTools {
     const ctx = cvs.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    if (!this.cv.candles || this.hidden) return;   // Cmd+Alt+H — разметка спрятана
+    this._paint(ctx, false);
+    this._panelUpdate();   // плавающая панель едет за рисунком при прокрутке и масштабе
+  }
+
+  /* Рисует рисунки пользователя в ctx (CSS-пиксели, transform выставляет вызывающий).
+     clean = для снимка: без ручек выделения и без недорисованной фигуры. */
+  _paint(ctx, clean) {
+    if (!this.cv.candles || this.hidden) return;   // Cmd+Option+H — разметка спрятана
     const m = this._screen();
     if (!m.xOf) return;
     const paneW = this.cv._paneW(), paneH = this.cv._paneH();
@@ -2481,63 +3145,171 @@ class DrawTools {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    this.items.forEach((it, i) => this._renderItem(ctx, m, it, this._isSel(i), paneW));
-    if (this.draft) {
-      if (this.draft.type === 'ruler') this._renderRuler(ctx, m, this.draft);
-      else this._renderItem(ctx, m, this.draft, false, paneW, true);
+    this.items.forEach((it, i) => this._renderItem(ctx, m, it, !clean && this._isSel(i), paneW));
+    const d = this.draft;
+    if (d && !clean) {
+      if (d.type === 'ruler') this._renderRuler(ctx, m, d);
+      else this._renderItem(ctx, m, Object.assign(drawStyleFor(d.type), d), false, paneW, true);
     }
     if (this.ruler) this._renderRuler(ctx, m, this.ruler);
     ctx.restore();
   }
 
   _renderItem(ctx, m, it, selected, paneW, isDraft = false) {
-    if (it.type === 'hray') {
+    ctx.save();
+    try {
+      const col = dCol(it);
+      ctx.strokeStyle = col;
+      ctx.fillStyle = col;
+      ctx.lineWidth = dWid(it) + (selected ? 0.8 : 0);
+      ctx.setLineDash(isDraft ? [4, 3] : []);
+      this._drawItem(ctx, m, it, selected, paneW, col);
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  // подпись с тёмным ободком: читается и на свечах, и на снимке
+  _halo(ctx, text, x, y, col) {
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(13,17,23,0.85)';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = col;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  // пунктирная рамка вокруг выделенного рисунка без «ручек» по контуру (кисть, текст, эллипс)
+  _selBox(ctx, l, t, r, b) {
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(88,166,255,0.9)';
+    ctx.strokeRect(l - 3, t - 3, r - l + 6, b - t + 6);
+    ctx.restore();
+  }
+
+  _drawItem(ctx, m, it, selected, paneW, col) {
+    const paneH = this.cv._paneH();
+    const T = it.type;
+
+    if (T === 'hray') {
       const y = m.yOf(it.price), x0 = m.X(it.t);
       if (y == null) return;
-      ctx.strokeStyle = '#e6edf3';
-      ctx.lineWidth = selected ? 2 : 1.4;
       ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(paneW, y); ctx.stroke();
       const label = this._fmt(it.price);
-      ctx.fillStyle = '#e6edf3';
       ctx.fillText(label, paneW - ctx.measureText(label).width - 4, y - 4);
-      if (selected) this._handles(ctx, [[x0, y]]);
+      if (selected) this._handles(ctx, [[x0, y]], col);
       return;
     }
 
-    if (it.type === 'path') {
+    if (T === 'vline') {
+      const x0 = m.X(it.t);
+      ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0, paneH); ctx.stroke();
+      return;
+    }
+
+    if (T === 'cross') {
+      const x0 = m.X(it.t), y = m.yOf(it.price);
+      if (y == null) return;
+      ctx.beginPath();
+      ctx.moveTo(x0, 0); ctx.lineTo(x0, paneH);
+      ctx.moveTo(0, y); ctx.lineTo(paneW, y);
+      ctx.stroke();
+      if (selected) this._handles(ctx, [[x0, y]], col);
+      return;
+    }
+
+    if (T === 'text') {
+      const b = this._textBox(it, m);
+      if (!b) return;
+      ctx.font = drawFont(it.sz || TEXT_SIZES[1]);
+      ctx.textBaseline = 'middle';
+      this._halo(ctx, it.txt, b.l, (b.t + b.b) / 2, col);
+      if (selected) this._selBox(ctx, b.l, b.t, b.r, b.b);
+      return;
+    }
+
+    if (T === 'path' || T === 'brush') {
       const pts = it.pts.map(p => [m.X(p.t), m.yOf(p.price)]);
       if (pts.some(p => p[1] == null)) return;
-      ctx.strokeStyle = '#58a6ff';
-      ctx.lineWidth = selected ? 2.4 : 1.7;
-      if (isDraft) ctx.setLineDash([4, 3]);
       ctx.beginPath();
       ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+      if (T === 'brush' && pts.length > 2) {
+        // сглаживаем: кривые через середины отрезков
+        for (let k = 1; k < pts.length - 1; k++) {
+          ctx.quadraticCurveTo(pts[k][0], pts[k][1], (pts[k][0] + pts[k + 1][0]) / 2, (pts[k][1] + pts[k + 1][1]) / 2);
+        }
+        ctx.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+      } else {
+        for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+      }
       ctx.stroke();
-      ctx.setLineDash([]);
-      const n = pts.length;
-      if (n >= 2) this._arrowHead(ctx, pts[n - 2], pts[n - 1]);
-      if (selected) this._handles(ctx, pts);
+      if (T === 'path') {
+        const n = pts.length;
+        if (n >= 2) this._arrowHead(ctx, pts[n - 2], pts[n - 1], col);
+        if (selected) this._handles(ctx, pts, col);
+      } else if (selected) {
+        const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+        this._selBox(ctx, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+      }
       return;
     }
 
     const x1 = m.X(it.p1.t), y1 = m.yOf(it.p1.price);
     const x2 = m.X(it.p2.t), y2 = m.yOf(it.p2.price);
     if (y1 == null || y2 == null) return;
-    ctx.strokeStyle = '#58a6ff';
-    ctx.lineWidth = selected ? 2.4 : 1.7;
-    if (isDraft) ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    ctx.setLineDash([]);
+    const l = Math.min(x1, x2), r = Math.max(x1, x2), t = Math.min(y1, y2), b = Math.max(y1, y2);
 
-    if (selected) this._handles(ctx, [[x1, y1], [x2, y2]]);
+    if (T === 'rect' || T === 'ellipse') {
+      ctx.beginPath();
+      if (T === 'rect') ctx.rect(l, t, r - l, b - t);
+      else ctx.ellipse((l + r) / 2, (t + b) / 2, Math.max((r - l) / 2, 0.5), Math.max((b - t) / 2, 0.5), 0, 0, Math.PI * 2);
+      if ((it.fa || 0) > 0) { ctx.fillStyle = drawRgba(col, it.fa); ctx.fill(); }
+      ctx.stroke();
+      if (selected) {
+        if (T === 'ellipse') this._selBox(ctx, l, t, r, b);
+        this._handles(ctx, [[x1, y1], [x2, y2], [x1, y2], [x2, y1]], col);
+      }
+      return;
+    }
+
+    if (T === 'fib') {
+      const xr = it.ext ? paneW : r;
+      const lv = this._fibLevels(it, m);
+      // заливка полосами между соседними уровнями (через одну плотнее)
+      for (let k = 1; k < lv.length; k++) {
+        if (lv[k].y == null || lv[k - 1].y == null) continue;
+        ctx.fillStyle = drawRgba(col, k % 2 ? 0.05 : 0.11);
+        ctx.fillRect(l, Math.min(lv[k - 1].y, lv[k].y), xr - l, Math.abs(lv[k].y - lv[k - 1].y));
+      }
+      ctx.textBaseline = 'alphabetic';
+      for (const p of lv) {
+        if (p.y == null) continue;
+        ctx.beginPath(); ctx.moveTo(l, p.y); ctx.lineTo(xr, p.y); ctx.stroke();
+        if (it.lab) this._halo(ctx, `${p.lv} (${this._fmt(p.price)})`, Math.max(l, 0) + 4, p.y - 3, col);
+      }
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.restore();
+      if (selected) this._handles(ctx, [[x1, y1], [x2, y2]], col);
+      return;
+    }
+
+    // trend
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (selected) this._handles(ctx, [[x1, y1], [x2, y2]], col);
   }
 
   // наконечник в конце последнего колена траектории
-  _arrowHead(ctx, [x1, y1], [x2, y2]) {
+  _arrowHead(ctx, [x1, y1], [x2, y2], col) {
     if (Math.hypot(x2 - x1, y2 - y1) < 4) return;
     const a = Math.atan2(y2 - y1, x2 - x1), L = 11, w = 0.42;
-    ctx.fillStyle = '#58a6ff';
+    ctx.fillStyle = col || '#58a6ff';
     ctx.beginPath();
     ctx.moveTo(x2, y2);
     ctx.lineTo(x2 - L * Math.cos(a - w), y2 - L * Math.sin(a - w));
@@ -2557,10 +3329,20 @@ class DrawTools {
     ctx.strokeStyle = col + ',0.9)';
     ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    // что показывать в подписи, выбирается долгим нажатием на значок линейки
+    const o = Object.assign({ pct: true, px: true, bars: true, time: true }, DRAW_DEF.ruler || {});
     const dPct = (r.p2.price - r.p1.price) / r.p1.price * 100;
     const bars = Math.round(Math.abs(r.p2.t - r.p1.t) / this._iv());
     const mins = bars * this._iv() / 60;
-    const label = `${dPct > 0 ? '+' : ''}${dPct.toFixed(2)}% · ${this._fmt(Math.abs(r.p2.price - r.p1.price))} · ${bars} бар (${mins >= 60 ? (mins / 60).toFixed(1) + 'ч' : mins + 'м'})`;
+    const tm = mins >= 60 ? (mins / 60).toFixed(1) + 'ч' : mins + 'м';
+    const parts = [];
+    if (o.pct) parts.push(`${dPct > 0 ? '+' : ''}${dPct.toFixed(2)}%`);
+    if (o.px) parts.push(this._fmt(Math.abs(r.p2.price - r.p1.price)));
+    if (o.bars && o.time) parts.push(`${bars} бар (${tm})`);
+    else if (o.bars) parts.push(`${bars} бар`);
+    else if (o.time) parts.push(tm);
+    if (!parts.length) return;
+    const label = parts.join(' · ');
     const tw = ctx.measureText(label).width;
     const bx = (x1 + x2) / 2 - tw / 2 - 5, by = Math.min(y1, y2) - 22;
     ctx.fillStyle = 'rgba(13,17,23,0.92)';
@@ -2571,17 +3353,1055 @@ class DrawTools {
     ctx.fillText(label, bx + 5, by + 11);
   }
 
-  _handles(ctx, pts) {
+  _handles(ctx, pts, col) {
     for (const [x, y] of pts) {
       ctx.fillStyle = '#0d1117';
-      ctx.strokeStyle = '#58a6ff';
+      ctx.strokeStyle = col || '#58a6ff';
       ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
       ctx.beginPath();
       ctx.arc(x, y, 4, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
     }
   }
 }
+
+</script>
+<script>
+/* Надстройка над DrawTools (draw.js): всё, что делает рисование «кликабельным» без клавиш.
+   - плавающая панель у выделенного рисунка: цвет, толщина, заливка, дубль, удаление, «⋮»
+   - меню рисунка (правый клик или «⋮»): оповещение на уровне, дубль, порядок, удалить
+   - настройки инструмента по долгому нажатию на значок (фибо, линейка, цвета по умолчанию)
+   - ввод и правка текстовой метки
+   Методы дописываются в прототип, поэтому файл грузится строго после draw.js. */
+Object.assign(DrawTools.prototype, {
+
+  /* ---------- долгое нажатие ---------- */
+  // fn срабатывает через 450 мс удержания (тач, мышь) или по правому клику на значке
+  _longPress(btn, fn) {
+    let timer = null, sx = 0, sy = 0;
+    const cancel = () => { clearTimeout(timer); timer = null; };
+    btn.addEventListener('pointerdown', e => {
+      if (e.button > 0) return;
+      btn._lp = false;
+      sx = e.clientX; sy = e.clientY;
+      cancel();
+      timer = setTimeout(() => { timer = null; btn._lp = true; fn(); }, 450);
+    });
+    btn.addEventListener('pointermove', e => {
+      if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) cancel();
+    });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) btn.addEventListener(ev, cancel);
+    // правый клик и системное меню долгого нажатия (Android) ведут туда же
+    btn.addEventListener('contextmenu', e => { e.preventDefault(); cancel(); btn._lp = false; fn(); });
+  },
+
+  /* ---------- дублировать, порядок ---------- */
+  duplicateSel() {
+    if (!this.sel.length) return;
+    this._pushHistory();
+    const d = this._screenDelta(18, 18);   // копия чуть правее и ниже, чтобы было видно
+    const ns = [];
+    for (const i of [...this.sel].sort((a, b) => a - b)) {
+      if (!this.items[i]) continue;
+      const it = JSON.parse(JSON.stringify(this.items[i]));
+      this._shift(it, d.dt, d.dp);
+      this.items.push(it);
+      ns.push(this.items.length - 1);
+    }
+    this.sel = ns;
+    this._save();
+    this.cv.requestDraw();
+    this._toast('Копия создана');
+  },
+
+  // front = true: на передний план, false: на задний. Порядок в списке = порядок наложения
+  zOrder(front) {
+    if (!this.sel.length) return;
+    this._pushHistory();
+    const idx = [...this.sel].sort((a, b) => a - b);
+    const chosen = idx.map(i => this.items[i]).filter(Boolean);
+    const rest = this.items.filter((_, i) => !idx.includes(i));
+    this.items = front ? rest.concat(chosen) : chosen.concat(rest);
+    this.sel = chosen.map((_, k) => front ? rest.length + k : k);
+    this._save();
+    this.cv.requestDraw();
+    this._toast(front ? 'На переднем плане' : 'На заднем плане');
+  },
+
+  // стиль у всех выделенных сразу
+  _styleSel(patch) {
+    if (!this.sel.length) return;
+    this._pushHistory();
+    for (const i of this.sel) if (this.items[i]) Object.assign(this.items[i], patch);
+    this._save();
+    this.cv.requestDraw();
+  },
+
+  /* ---------- плавающая панель у выделенного ---------- */
+  _panelBuild() {
+    const fp = document.createElement('div');
+    fp.className = 'draw-fp';
+    fp.hidden = true;
+    const btn = (cls, icon, title) => `<button type="button" class="${cls}" title="${title}">${DRAW_ICONS[icon]}</button>`;
+    fp.innerHTML =
+      '<div class="fp-colors">' + DRAW_PALETTE.map(c =>
+        `<button type="button" class="fp-c" data-c="${c}" style="--c:${c}" title="Цвет"></button>`).join('') + '</div>' +
+      '<div class="fp-widths">' + DRAW_WIDTHS.map(w =>
+        `<button type="button" class="fp-w" data-w="${w}" title="Толщина"><i style="height:${w}px"></i></button>`).join('') + '</div>' +
+      btn('fp-fill', 'fill', 'Заливка: нет, лёгкая, плотная') +
+      '<button type="button" class="fp-sz" title="Размер текста">A</button>' +
+      btn('fp-edit', 'edit', 'Изменить текст') +
+      btn('fp-gear', 'gear', 'Уровни и оформление') +
+      '<span class="fp-sep"></span>' +
+      btn('fp-dup', 'copy', 'Дублировать') +
+      btn('fp-del', 'trash', `Удалить · Delete`) +
+      btn('fp-more', 'dots', 'Меню рисунка (то же, что правый клик)');
+    // клики внутри панели до графика не доходят: выделение не слетает
+    fp.addEventListener('pointerdown', e => e.stopPropagation());
+    fp.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (e.detail) b.blur();   // после клика мышью фокус со значка снимаем, чтобы Enter не нажал его снова
+      const items = this.sel.map(i => this.items[i]).filter(Boolean);
+      if (!items.length) return;
+      const one = this.sel.length === 1 ? this.sel[0] : null;
+      if (b.classList.contains('fp-c')) this._styleSel({ c: b.dataset.c });
+      else if (b.classList.contains('fp-w')) this._styleSel({ w: +b.dataset.w });
+      else if (b.classList.contains('fp-fill')) {
+        const cur = DRAW_FILLS.indexOf(items[0].fa != null ? items[0].fa : DRAW_FILLS[1]);
+        this._styleSel({ fa: DRAW_FILLS[(cur + 1) % DRAW_FILLS.length] });
+      } else if (b.classList.contains('fp-sz')) {
+        const cur = TEXT_SIZES.indexOf(items[0].sz || TEXT_SIZES[1]);
+        this._styleSel({ sz: TEXT_SIZES[(cur + 1) % TEXT_SIZES.length] });
+      } else if (b.classList.contains('fp-edit') && one != null) {
+        const it = this.items[one];
+        this._textOpen({ t: it.t, price: it.price }, one);
+      } else if (b.classList.contains('fp-gear') && one != null) this._formOpen(this.items[one].type, one, b);
+      else if (b.classList.contains('fp-dup')) this.duplicateSel();
+      else if (b.classList.contains('fp-del')) this._deleteSelected();
+      else if (b.classList.contains('fp-more') && one != null) {
+        const r = b.getBoundingClientRect(), c = this.cv.el.getBoundingClientRect();
+        this._itemMenu(one, r.left - c.left, r.bottom - c.top + 4);
+      }
+      this._fpSig = null;
+      this._panelUpdate();
+    });
+    this.cv.el.appendChild(fp);
+    this._fp = fp;
+    return fp;
+  },
+
+  // экранная «точка привязки» рисунка для панели: { ax, top, bottom } или null, если он вне поля
+  _itemAnchor(it, m, paneW, paneH) {
+    const k = DRAW_KIND[it.type];
+    let l, r, t, b, ax;
+    if (it.type === 'hray') {
+      const y = m.yOf(it.price); if (y == null) return null;
+      const x0 = m.X(it.t);
+      l = Math.max(x0, 0); r = paneW; t = b = y; ax = Math.min(l + 90, paneW - 90);
+    } else if (it.type === 'vline') {
+      const x0 = m.X(it.t);
+      l = r = ax = x0; t = b = 44;
+    } else if (it.type === 'cross') {
+      const y = m.yOf(it.price); if (y == null) return null;
+      l = r = ax = m.X(it.t); t = b = y;
+    } else if (it.type === 'text') {
+      const bx = this._textBox(it, m); if (!bx) return null;
+      l = bx.l; r = bx.r; t = bx.t; b = bx.b; ax = (l + r) / 2;
+    } else if (k === 'many') {
+      const ys = it.pts.map(p => m.yOf(p.price));
+      if (ys.some(v => v == null)) return null;
+      const xs = it.pts.map(p => m.X(p.t));
+      l = Math.min(...xs); r = Math.max(...xs); t = Math.min(...ys); b = Math.max(...ys); ax = (l + r) / 2;
+    } else {
+      const y1 = m.yOf(it.p1.price), y2 = m.yOf(it.p2.price);
+      if (y1 == null || y2 == null) return null;
+      const x1 = m.X(it.p1.t), x2 = m.X(it.p2.t);
+      l = Math.min(x1, x2); r = Math.max(x1, x2); t = Math.min(y1, y2); b = Math.max(y1, y2);
+      if (it.type === 'fib' && it.ext) r = paneW;
+      ax = (Math.max(l, 0) + Math.min(r, paneW)) / 2;
+    }
+    if (r < 0 || l > paneW || b < 0 || t > paneH) return null;   // рисунок за краем экрана
+    return { ax, top: t, bottom: b };
+  },
+
+  _panelUpdate() {
+    const fp = this._fp;
+    const items = this.sel.map(i => this.items[i]).filter(Boolean);
+    const busy = this.drag && this.drag.moved;   // пока тянем - панель не мешает
+    if (!items.length || this.tool !== 'cursor' || this.draft || this.hidden || busy || this._textEl || !this.cv.candles) {
+      if (fp) fp.hidden = true;
+      return;
+    }
+    const m = this._screen();
+    if (!m.xOf) { if (fp) fp.hidden = true; return; }
+    const paneW = this.cv._paneW(), paneH = this.cv._paneH();
+    const anchors = items.map(it => this._itemAnchor(it, m, paneW, paneH)).filter(Boolean);
+    if (!anchors.length) { if (fp) fp.hidden = true; return; }
+
+    const box = fp || this._panelBuild();
+    // состав кнопок и подсветка зависят от того, что выделено; пересчитываем, только если это поменялось
+    const sig = JSON.stringify(items.map(i => [i.type, i.c, i.w, i.fa, i.sz]));
+    if (sig !== this._fpSig) {
+      this._fpSig = sig;
+      const all = t => items.every(i => t.includes(i.type));
+      const first = items[0], one = items.length === 1;
+      const show = (sel, v) => { const el = box.querySelector(sel); if (el) el.hidden = !v; };
+      show('.fp-widths', !all(['text']));
+      show('.fp-fill', all(['rect', 'ellipse']));
+      show('.fp-sz', all(['text']));
+      show('.fp-edit', one && first.type === 'text');
+      show('.fp-gear', one && first.type === 'fib');
+      show('.fp-more', one);
+      const c0 = dCol(first), sameC = items.every(i => dCol(i) === c0);
+      box.querySelectorAll('.fp-c').forEach(b => b.classList.toggle('on', sameC && b.dataset.c.toLowerCase() === c0.toLowerCase()));
+      const w0 = dWid(first);
+      const near = DRAW_WIDTHS.reduce((a, b) => Math.abs(b - w0) < Math.abs(a - w0) ? b : a);
+      box.querySelectorAll('.fp-w').forEach(b => b.classList.toggle('on', +b.dataset.w === near));
+      const fa = first.fa != null ? first.fa : DRAW_FILLS[1];
+      const fb = box.querySelector('.fp-fill');
+      if (fb) fb.style.setProperty('--lvl', fa ? String(0.35 + fa * 2) : '0.25');
+      const zb = box.querySelector('.fp-sz');
+      if (zb) zb.textContent = first.sz || TEXT_SIZES[1];
+    }
+
+    box.hidden = false;
+    const top = Math.min(...anchors.map(a => a.top)), bottom = Math.max(...anchors.map(a => a.bottom));
+    const ax = anchors.reduce((s, a) => s + a.ax, 0) / anchors.length;
+    const w = box.offsetWidth, h = box.offsetHeight;
+    const W = this.cv.el.clientWidth, H = this.cv._paneH();
+    let y = top - h - 12;
+    if (y < 4) y = bottom + 12;                       // сверху нет места - под рисунком
+    y = Math.max(4, Math.min(y, H - h - 4));
+    let x = Math.max(4, Math.min(ax - w / 2, W - w - 4));
+    // не налезаем на панель инструментов слева, если по высоте пересекаемся с ней
+    const bar = this.bar;
+    if (bar && y < bar.offsetTop + bar.offsetHeight && y + h > bar.offsetTop) {
+      const minX = bar.offsetLeft + bar.offsetWidth + 6;
+      if (minX + w + 4 <= W) x = Math.max(x, minX);
+    }
+    box.style.left = x + 'px';
+    box.style.top = y + 'px';
+  },
+
+  /* ---------- меню рисунка ---------- */
+  // цена, на которую ставим оповещение: у уровня - его цена, у фигуры - ближайшая к клику грань
+  _itemLevel(it, yScr) {
+    const ser = this.cv.series;
+    const pick = arr => arr.reduce((a, b) =>
+      Math.abs((ser.priceToCoordinate(b) ?? 1e9) - yScr) < Math.abs((ser.priceToCoordinate(a) ?? 1e9) - yScr) ? b : a);
+    switch (it.type) {
+      case 'hray': case 'cross': case 'text': return it.price;
+      case 'trend': case 'rect': case 'ellipse': return pick([it.p1.price, it.p2.price]);
+      case 'fib': return pick(this._fibLevels(it).map(l => l.price));
+      default: return ser.coordinateToPrice(yScr);
+    }
+  },
+
+  _itemMenu(i, x, y) {
+    const it = this.items[i];
+    if (!it) return;
+    const lvl = this._itemLevel(it, y);
+    const rows = [];
+    if (lvl != null && lvl > 0) rows.push({ icon: 'bell', label: `Оповещение на ${this._fmt(lvl)}`, fn: () => this._sendAlert(lvl) });
+    if (it.type === 'text') rows.push({ icon: 'edit', label: 'Изменить текст', fn: () => this._textOpen({ t: it.t, price: it.price }, this.items.indexOf(it)) });
+    if (it.type === 'fib') rows.push({ icon: 'gear', label: 'Уровни и оформление', fn: () => this._formOpen('fib', this.items.indexOf(it), null) });
+    rows.push({ icon: 'copy', label: 'Дублировать', fn: () => this.duplicateSel() });
+    rows.push({ sep: true });
+    rows.push({ icon: 'front', label: 'На передний план', fn: () => this.zOrder(true) });
+    rows.push({ icon: 'back', label: 'На задний план', fn: () => this.zOrder(false) });
+    rows.push({ sep: true });
+    rows.push({ icon: 'trash', label: 'Удалить', danger: true, fn: () => this._deleteSelected() });
+    this._ctxShow(x, y, DRAW_NAMES[it.type] || 'Рисунок', rows);
+  },
+
+  /* ---------- текстовая метка ---------- */
+  // Нажатие поставило точку; поле ввода откроется по click (см. конструктор) или через 350 мс, если click не пришёл
+  _textPending(pos) {
+    const p = { pos };
+    this._textPend = p;
+    setTimeout(() => { if (this._textPend === p) this._textPendingFire(); }, 350);
+  },
+
+  _textPendingFire() {
+    const p = this._textPend;
+    if (!p) return;
+    this._textPend = null;
+    if (this.tool === 'text' && !this._textEl) this._textOpen(p.pos, null);
+  },
+
+  // pos - куда ставим; idx - индекс существующей метки, если правим её
+  _textOpen(pos, idx) {
+    this._textClose(true);
+    this._ctxClose();
+    const m = this._screen();
+    const x = m.X(pos.t), y = m.yOf(pos.price);
+    if (y == null) return;
+    const it = idx != null ? this.items[idx] : null;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'draw-textin';
+    inp.maxLength = 80;
+    inp.placeholder = 'Текст…';
+    inp.enterKeyHint = 'done';
+    inp.autocomplete = 'off';
+    inp.spellcheck = false;
+    inp.value = it ? it.txt : '';
+    const W = this.cv.el.clientWidth;
+    inp.style.left = Math.max(4, Math.min(x, W - 190)) + 'px';
+    inp.style.top = Math.max(4, y - 17) + 'px';
+    inp.addEventListener('keydown', ev => {
+      ev.stopPropagation();   // буквы и Esc не должны включать инструменты
+      if (ev.key === 'Enter') { ev.preventDefault(); this._textClose(true); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); this._textClose(false); }
+    });
+    inp.addEventListener('pointerdown', ev => ev.stopPropagation());
+    inp.addEventListener('blur', () => { if (this._textEl === inp) this._textClose(true); });
+    this._textEl = inp;
+    this._textCtx = { pos, idx };
+    this.cv.el.appendChild(inp);
+    inp.focus();
+    inp.select();
+    this._panelUpdate();
+  },
+
+  _textClose(commit) {
+    this._textPend = null;
+    const inp = this._textEl;
+    if (!inp) return;
+    const c = this._textCtx;
+    this._textEl = null;
+    this._textCtx = null;
+    const val = inp.value.trim();
+    inp.remove();
+    if (!commit || !val) { this.cv.requestDraw(); return; }
+    if (c.idx != null) {
+      const it = this.items[c.idx];
+      if (it && it.txt !== val) { this._pushHistory(); it.txt = val; this._save(); }
+    } else {
+      this._pushHistory();
+      this.items.push(this._newItem('text', { t: c.pos.t, price: c.pos.price, txt: val }));
+      this.sel = [this.items.length - 1];
+      this._save();
+      this.setTool('cursor');
+    }
+    this.cv.requestDraw();
+  },
+
+  /* ---------- настройки инструмента ---------- */
+  /* kind - тип рисунка или ruler. idx == null: настройки «по умолчанию» для новых рисунков
+     (то, что открывается долгим нажатием на значок); иначе правим уже нарисованный рисунок.
+     Изменения применяются сразу, кнопки «Готово» нет. */
+  _formOpen(kind, idx, anchor) {
+    this._formClose();
+    this._textClose(true);
+    this._ctxClose();
+    const it = idx != null ? this.items[idx] : null;
+    if (idx != null && !it) return;
+    const box = document.createElement('div');
+    box.className = 'draw-form';
+    this.formEl = box;
+    this._formKind = kind;
+    this._formIdx = idx;
+    this._formHist = false;
+
+    const cur = () => it ? it : (kind === 'ruler' ? Object.assign({ pct: true, px: true, bars: true, time: true }, DRAW_DEF.ruler || {}) : drawStyleFor(kind));
+    const set = patch => {
+      if (it) {
+        if (!this._formHist) { this._pushHistory(); this._formHist = true; }   // вся правка в форме - один шаг отмены
+        Object.assign(it, patch);
+        this._save();
+      } else {
+        DRAW_DEF[kind] = Object.assign(DRAW_DEF[kind] || {}, patch);
+        drawDefSave();
+      }
+      this.cv.requestDraw();
+      draw();
+    };
+
+    const draw = () => {
+      const v = cur();
+      const sw = DRAW_PALETTE.map(c =>
+        `<button type="button" class="df-c${dCol(v.c ? v : { type: kind }).toLowerCase() === c ? ' on' : ''}" data-c="${c}" style="--c:${c}"></button>`).join('');
+      const seg = (name, opts, val) => opts.map(([label, o]) =>
+        `<button type="button" class="df-s${o === val ? ' on' : ''}" data-${name}="${o}">${label}</button>`).join('');
+      const chk = (name, label, on) =>
+        `<label class="df-k${on ? ' on' : ''}"><input type="checkbox" data-k="${name}"${on ? ' checked' : ''}><span>${label}</span></label>`;
+      let h = `<div class="dh-head"><b>${DRAW_NAMES[kind]}: настройки</b><button type="button" class="dh-x" title="Закрыть · Esc">×</button></div>` +
+              `<div class="df-note">${it ? 'Только для этого рисунка' : 'Для новых рисунков'}</div>`;
+      if (kind === 'ruler') {
+        h += '<div class="df-cap">Что показывать в подписи</div><div class="df-checks">' +
+             chk('pct', 'Изменение, %', v.pct) + chk('px', 'Изменение цены', v.px) +
+             chk('bars', 'Число баров', v.bars) + chk('time', 'Время', v.time) + '</div>';
+      } else {
+        h += `<div class="df-cap">Цвет</div><div class="df-row">${sw}</div>`;
+        if (kind !== 'text') {
+          const w0 = v.w || DRAW_WIDTH0[kind];
+          const near = DRAW_WIDTHS.reduce((a, b) => Math.abs(b - w0) < Math.abs(a - w0) ? b : a);
+          h += `<div class="df-cap">Толщина</div><div class="df-row">${seg('w', [['тонкая', 1], ['средняя', 2], ['толстая', 3.5]], near)}</div>`;
+        }
+        if (kind === 'rect' || kind === 'ellipse') {
+          h += `<div class="df-cap">Заливка</div><div class="df-row">${seg('fa', [['нет', 0], ['лёгкая', 0.12], ['плотная', 0.28]], v.fa != null ? v.fa : 0.12)}</div>`;
+        }
+        if (kind === 'text') {
+          h += `<div class="df-cap">Размер</div><div class="df-row">${seg('sz', TEXT_SIZES.map(s => [String(s), s]), v.sz || TEXT_SIZES[1])}</div>`;
+        }
+        if (kind === 'fib') {
+          const lv = v.lv || FIB_LEVELS0;
+          h += '<div class="df-cap">Уровни (0 - конец, 1 - начало рисунка)</div><div class="df-lv">' +
+               FIB_LEVELS_ALL.map(l => `<button type="button" class="df-l${lv.includes(l) ? ' on' : ''}" data-l="${l}">${l}</button>`).join('') + '</div>' +
+               '<div class="df-checks">' + chk('ext', 'Продлить линии вправо', v.ext) + chk('lab', 'Подписи: уровень и цена', v.lab) + '</div>';
+        }
+      }
+      if (!it) h += '<button type="button" class="df-reset">Сбросить настройки инструмента</button>';
+      box.innerHTML = h;
+    };
+
+    box.addEventListener('pointerdown', e => e.stopPropagation());
+    box.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.classList.contains('dh-x')) this._formClose();
+      else if (b.classList.contains('df-c')) set({ c: b.dataset.c });
+      else if (b.dataset.w != null) set({ w: +b.dataset.w });
+      else if (b.dataset.fa != null) set({ fa: +b.dataset.fa });
+      else if (b.dataset.sz != null) set({ sz: +b.dataset.sz });
+      else if (b.dataset.l != null) {
+        const l = +b.dataset.l, lv = (cur().lv || FIB_LEVELS0).slice();
+        const k = lv.indexOf(l);
+        if (k >= 0) { if (lv.length > 1) lv.splice(k, 1); } else lv.push(l);   // хоть один уровень оставляем
+        set({ lv: lv.sort((a, c) => a - c) });
+      } else if (b.classList.contains('df-reset')) {
+        delete DRAW_DEF[kind];
+        drawDefSave();
+        draw();
+        this._toast('Настройки сброшены');
+      }
+    });
+    box.addEventListener('change', e => {
+      const k = e.target.dataset && e.target.dataset.k;
+      if (k) set({ [k]: kind === 'fib' ? (e.target.checked ? 1 : 0) : e.target.checked });
+    });
+    draw();
+
+    // на телефоне форма не влезает в график (он низкий и обрезает всё, что выходит за край):
+    // показываем её листом снизу поверх страницы
+    if (matchMedia('(pointer: coarse), (max-width: 760px)').matches) {
+      box.classList.add('sheet');
+      document.body.appendChild(box);
+      this._bindFormOutside();
+      return;
+    }
+    this.cv.el.appendChild(box);
+
+    // рядом со значком (или с панелью у рисунка), но не за краем графика
+    const cr = this.cv.el.getBoundingClientRect();
+    const ar = (anchor || this.bar).getBoundingClientRect();
+    const br = this.bar.getBoundingClientRect();
+    const w = box.offsetWidth, h = box.offsetHeight;
+    const fromPanel = anchor && anchor.closest('.draw-fp');
+    // от значка инструмента: правее всей панели (она в две колонки), по высоте вровень со значком
+    const left = fromPanel ? ar.left - cr.left : br.right - cr.left + 8;
+    const top = fromPanel ? ar.bottom - cr.top + 6 : ar.top - cr.top;
+    box.style.left = Math.max(4, Math.min(left, cr.width - w - 4)) + 'px';
+    box.style.top = Math.max(4, Math.min(top, cr.height - h - 4)) + 'px';
+
+    this._bindFormOutside();
+  },
+
+  // клик мимо закрывает форму (один слушатель на график)
+  _bindFormOutside() {
+    if (this._formOutside) return;
+    this._formOutside = ev => {
+      if (!this.formEl) return;
+      const t = ev.target instanceof Element ? ev.target : null;
+      if (t && (t.closest('.draw-form') || t.closest('.draw-toolbar button') || t.closest('.draw-fp'))) return;
+      this._formClose();
+    };
+    window.addEventListener('pointerdown', this._formOutside, true);
+  },
+
+  _formClose() {
+    if (this.formEl) { this.formEl.remove(); this.formEl = null; }
+  },
+});
+
+</script>
+<script>
+/* Снимок графика: одна PNG-картинка из свечей, авторазметки SMC, рисунков пользователя
+   и подписи канала. Кнопка-камера в шапке открывает меню «Скачать» / «Скопировать».
+
+   Как собирается кадр (снизу вверх, ровно как на экране):
+     1. фон #0d1117: у графика он прозрачный, а PNG с прозрачностью в чатах выглядит грязно
+     2. chart.takeScreenshot(): свечи, сетка, шкалы, маркеры SFP и ножей. Холст в физических
+        пикселях экрана, поэтому на retina снимок чёткий
+     3. авторазметка SMC (ChartView._paint) и рисунки пользователя (DrawTools._paint)
+        рисуются заново прямо на этот холст в физических пикселях, а не копируются готовыми
+        канвасами с экрана: линии остаются чёткими, а ручки выделения в кадр не попадают
+     4. название монеты и таймфрейм, подпись канала
+   Шапка, список монет, панель инструментов и кнопки в кадр не попадают: они DOM, не холст.
+   Снимок каждый раз собирается заново из текущего состояния, ничего не кэшируется. */
+const Shot = (() => {
+  const CHANNEL_TAG = '@gmvtrader';   // подпись на снимке: юзернейм Telegram-канала GMV TRADES
+  const BG = '#0d1117';
+  const q = s => document.querySelector(s);
+
+  /* ---------- где мы запущены ---------- */
+
+  // Telegram.WebApp есть и в обычном браузере (скрипт грузится всегда), но platform там 'unknown'
+  const tgApp = () => {
+    const t = window.Telegram && window.Telegram.WebApp;
+    return t && t.platform && t.platform !== 'unknown' ? t : null;
+  };
+  // Мобильные и Apple-клиенты открывают Mini App в системном WebView. Клик по
+  // <a download> с blob-ссылкой там не скачивает, а может УВЕСТИ WebView на картинку,
+  // и Mini App придётся открывать заново. Поэтому внутри Telegram ссылки не кликаем.
+  const clipboardOK = () => !!(navigator.clipboard && navigator.clipboard.write && window.ClipboardItem);
+
+  /* ---------- активный график ---------- */
+
+  function activeChart() {
+    try {
+      const slot = CHART_SLOTS[state.mode];
+      return slot ? charts[slot[0]] : null;
+    } catch (e) { return null; }
+  }
+
+  function isReady(cv) {
+    return !!(cv && cv.candles && cv.candles.length && cv.el.clientWidth > 0 && cv.el.clientHeight > 0
+      && typeof cv.chart.takeScreenshot === 'function');
+  }
+
+  /* ---------- сборка кадра ---------- */
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // «ENAUSDT · 15M» в левом верхнем углу, как легенда на экране (без OHLC под курсором)
+  function drawTitle(ctx, cv) {
+    const t = cv._title;
+    if (!t) return;
+    ctx.save();
+    ctx.font = '11px ui-monospace, Menlo, monospace';
+    const tw = ctx.measureText(t).width;
+    ctx.fillStyle = 'rgba(13,17,23,0.65)';
+    roundRect(ctx, 8, 6, tw + 14, 19, 4);
+    ctx.fill();
+    ctx.fillStyle = '#c9d1d9';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(t, 15, 15.5);
+    ctx.restore();
+  }
+
+  // Подпись в правом нижнем углу области свечей. Размер считаем от ширины картинки, а не
+  // от CSS-пикселей: снимок чаще смотрят уменьшенным в чате, и подпись должна остаться читаемой.
+  // Под текстом лёгкая тёмная плашка: внизу графика часто лежат подписи уровней ($$$ EQL),
+  // и без плашки подпись сливалась бы с ними в кашу
+  function drawWatermark(ctx, W, paneW, paneH) {
+    const fs = Math.max(20, Math.round(W * 0.013));
+    const padX = Math.round(fs * 0.55), padY = Math.round(fs * 0.3);
+    const margin = Math.round(fs * 0.55);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.font = `600 ${fs}px -apple-system, "Helvetica Neue", Arial, sans-serif`;
+    const tw = ctx.measureText(CHANNEL_TAG).width;
+    const bw = tw + padX * 2, bh = fs + padY * 2;
+    const bx = paneW - margin - bw, by = paneH - margin - bh;
+    ctx.fillStyle = 'rgba(13,17,23,0.55)';
+    roundRect(ctx, bx, by, bw, bh, Math.round(bh * 0.3));
+    ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(230,237,243,0.72)';
+    ctx.fillText(CHANNEL_TAG, bx + padX, by + bh / 2 + fs * 0.04);
+    ctx.restore();
+  }
+
+  function build(cv) {
+    // после касания на телефоне перекрестие остаётся на графике: в кадре оно не нужно
+    try { cv.chart.clearCrosshairPosition(); } catch (e) {}
+
+    // takeScreenshot сам дорисовывает отложенные изменения графика, поэтому разметку
+    // считаем ПОСЛЕ него: координаты цена→пиксель уже актуальны
+    const base = cv.chart.takeScreenshot();
+    const W = base.width, H = base.height;
+    const out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    // alpha:false: фон всё равно сплошной, зато PNG получается заметно меньше и кодируется
+    // быстрее. willReadFrequently: холст в памяти, без обратного чтения с видеокарты при toBlob
+    const ctx = out.getContext('2d', { alpha: false, willReadFrequently: true });
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(base, 0, 0);
+
+    // Физических пикселей на CSS-пиксель: разметка знает только CSS-координаты. Холст
+    // библиотеки всегда равен CSS-размер графика × devicePixelRatio, поэтому берём именно
+    // DPR, а не отношение к el.clientWidth/Height: у графика бывает на пиксель меньше
+    // контейнера (дробная высота), и отношение давало бы ошибку масштаба до пикселя внизу
+    const dpr = window.devicePixelRatio || 1;
+    const k = Math.abs(W / cv.el.clientWidth - dpr) < 0.05 ? dpr : W / cv.el.clientWidth;
+    ctx.save();
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    cv._paint(ctx);                                       // OB, FVG, ликвидность, BOS/ЧоЧ, полосы, стены
+    if (cv.drawTools) cv.drawTools._paint(ctx, true);     // линии, лучи, траектории, линейка
+    drawTitle(ctx, cv);
+    ctx.restore();
+    drawWatermark(ctx, W, cv._paneW() * k, cv._paneH() * k);
+    return { canvas: out, w: W, h: H };
+  }
+
+  const toBlob = canvas => new Promise((res, rej) =>
+    canvas.toBlob(b => (b ? res(b) : rej(new Error('toBlob вернул null'))), 'image/png'));
+
+  function fileName() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    let tf = '';
+    try { tf = TF_CFG[state.mode].label; } catch (e) {}
+    return `GMV_${state.symbol || 'chart'}_${tf}_${stamp}.png`;
+  }
+
+  /* ---------- подсказки на экране ---------- */
+
+  const ICO_OK = '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 9.6 7.4 13.2 14.4 5.4"/></svg>';
+  const ICO_WAIT = '<svg class="spin" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 2.5a6.5 6.5 0 1 0 6.5 6.5"/></svg>';
+  const ICO_WARN = '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 4.4v5.6"/><circle cx="9" cy="13.2" r=".6" fill="currentColor"/></svg>';
+  let toastEl = null, toastTimer = null;
+
+  // Короткая подсказка внизу экрана. Успех держится 1,6 с, пояснения (откат на «Скачать»,
+  // «график ещё загружается») дольше: их нужно успеть прочитать. Без модальных окон
+  function toast(text, kind = 'ok') {
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.id = 'toast';
+      toastEl.setAttribute('role', 'status');
+      toastEl.setAttribute('aria-live', 'polite');
+      document.body.appendChild(toastEl);
+    }
+    toastEl.className = 'show ' + kind;
+    toastEl.innerHTML = (kind === 'ok' ? ICO_OK : kind === 'wait' ? ICO_WAIT : ICO_WARN) + '<span></span>';
+    toastEl.querySelector('span').textContent = text;
+    clearTimeout(toastTimer);
+    // «wait» снимается сам, когда действие закончилось; страховочный таймер на случай зависания
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), kind === 'ok' ? 1600 : kind === 'wait' ? 12000 : 3400);
+  }
+
+  // На медленных телефонах кодирование PNG заметно: если снимок не готов за 0,45 с,
+  // показываем «Готовлю снимок…», а по завершении убираем подсказку, если её никто не заменил
+  async function withBusyHint(fn) {
+    const t = setTimeout(() => toast('Готовлю снимок…', 'wait'), 450);
+    try { return await fn(); }
+    finally {
+      clearTimeout(t);
+      if (toastEl && toastEl.classList.contains('wait')) toastEl.classList.remove('show');
+    }
+  }
+
+  /* ---------- доставка картинки ---------- */
+
+  function anchorDownload(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.rel = 'noopener'; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);   // браузеру нужно время дочитать blob
+  }
+
+  const why = e => (e && e.name === 'NotAllowedError') ? 'нет разрешения на буфер обмена'
+    : (e && e.name === 'SecurityError') ? 'запрещено настройками'
+    : (e && e.name) || 'ошибка';
+
+  // null при успехе, иначе объект ошибки. Promise внутри ClipboardItem нужен Safari и WebView
+  // на его движке: они требуют начать запись в момент клика, до того как blob готов
+  async function writeClipboard(blobP) {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobP })]);
+      return null;
+    } catch (e1) {
+      if (e1 instanceof TypeError) {   // старые движки не принимают Promise, отдаём готовый blob
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': await blobP })]);
+          return null;
+        } catch (e2) { return e2; }
+      }
+      return e1;
+    }
+  }
+
+  /* Окно со снимком: последний рубеж внутри Telegram, где код не может ни скачать файл,
+     ни открыть системное «Поделиться». Картинку сохраняют сами: долгое нажатие на телефоне
+     или правый клик на компьютере. Это единственное место, где мы показываем окно. */
+  let sheet = null, sheetUrl = null;
+
+  function closeSheet() {
+    if (sheet) { sheet.hidden = true; sheet.querySelector('img').removeAttribute('src'); }
+    if (sheetUrl) { URL.revokeObjectURL(sheetUrl); sheetUrl = null; }
+  }
+
+  function openSheet(blob, name, tg) {
+    if (!sheet) {
+      sheet = document.createElement('div');
+      sheet.id = 'shotSheet';
+      sheet.hidden = true;
+      sheet.setAttribute('role', 'dialog');
+      sheet.setAttribute('aria-label', 'Снимок графика');
+      sheet.innerHTML =
+        '<div class="ss-card">' +
+          '<div class="ss-head"><b>Снимок графика</b><button type="button" class="ss-x" aria-label="Закрыть">×</button></div>' +
+          '<img alt="Снимок графика" draggable="false">' +
+          '<p class="ss-hint"></p>' +
+          '<div class="ss-btns"></div>' +
+        '</div>';
+      sheet.addEventListener('click', e => { if (e.target === sheet || e.target.closest('.ss-x')) closeSheet(); });
+      document.body.appendChild(sheet);
+    }
+    closeSheet();
+    sheetUrl = URL.createObjectURL(blob);
+    sheet.querySelector('img').src = sheetUrl;
+
+    const platform = tg ? tg.platform : '';
+    const mobile = ['ios', 'android', 'android_x'].includes(platform);
+    sheet.querySelector('.ss-hint').textContent = mobile
+      ? 'Нажми на картинку и удерживай, затем выбери «Сохранить изображение» или «Поделиться».'
+      : 'Скопируй снимок и вставь в чат, либо сохрани правым кликом по картинке.';
+
+    const btns = sheet.querySelector('.ss-btns');
+    btns.innerHTML = '';
+    if (clipboardOK()) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = 'Скопировать';
+      b.addEventListener('click', async () => {
+        const err = await writeClipboard(Promise.resolve(blob));
+        if (err) toast(`Не удалось скопировать (${why(err)})`, 'warn'); else toast('Скопировано в буфер');
+      });
+      btns.appendChild(b);
+    }
+    // Ссылку-скачивание даём только там, где WebView это переживает (не WKWebView и не Android WebView)
+    if (['tdesktop', 'weba', 'webk', 'unigram'].includes(platform)) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = 'Скачать файл';
+      b.addEventListener('click', () => { anchorDownload(blob, name); toast('Снимок сохранён'); });
+      btns.appendChild(b);
+    }
+    sheet.hidden = false;
+  }
+
+  /* Обычный браузер: скачиваем файлом. Внутри Telegram: системное «Поделиться» с файлом,
+     где оно есть, иначе окно со снимком. Telegram.WebApp.downloadFile здесь не годится:
+     он принимает только https-ссылку на файл в интернете, а наш снимок существует лишь
+     в памяти страницы, сервера, куда его можно выложить, у скринера нет. */
+  async function deliver(blob, name, reason) {
+    // reason: почему пришлось откатиться на «Скачать» (копирование не вышло). Итог показываем
+    // ОДНИМ сообщением: два тоста подряд, и причину человек бы не успел прочитать
+    const say = (plain, withReason) => reason ? toast(`${reason}. ${withReason}`, 'warn') : toast(plain);
+    const tg = tgApp();
+    if (!tg) {
+      anchorDownload(blob, name);
+      say('Снимок сохранён', 'Снимок сохранён файлом');
+      return 'download';
+    }
+    const file = new File([blob], name, { type: 'image/png' });
+    let canShare = false;
+    try { canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) {}
+    if (canShare) {
+      try {
+        await navigator.share({ files: [file], title: 'GMV TRADES' });
+        say('Готово', 'Открыл «Поделиться»');
+        return 'share';
+      } catch (e) {
+        if (e && e.name === 'AbortError') return 'cancel';   // человек закрыл окно «Поделиться»
+      }
+    }
+    openSheet(blob, name, tg);
+    if (reason) toast(`${reason}. Снимок ниже, сохрани его отсюда`, 'warn');
+    return 'sheet';
+  }
+
+  /* ---------- действия меню ---------- */
+
+  function prepare() {
+    const cv = activeChart();
+    if (!isReady(cv)) { toast('График ещё загружается', 'warn'); return null; }
+    let shot;
+    try { shot = build(cv); } catch (e) {
+      console.error(e);
+      toast('Не удалось собрать снимок', 'warn');
+      return null;
+    }
+    api.last = { sym: state.symbol, tf: (TF_CFG[state.mode] || {}).label, w: shot.w, h: shot.h, at: Date.now() };
+    return { blobP: toBlob(shot.canvas), name: fileName() };
+  }
+
+  async function download() {
+    const p = prepare();
+    if (!p) return null;
+    return withBusyHint(async () => {
+      try { return await deliver(await p.blobP, p.name); }
+      catch (e) { console.error(e); toast('Не удалось создать снимок', 'warn'); return null; }
+    });
+  }
+
+  async function copy() {
+    const p = prepare();
+    if (!p) return null;
+    return withBusyHint(async () => {
+      try {
+        let reason;
+        if (!clipboardOK()) {
+          reason = 'Буфер обмена здесь недоступен';
+        } else {
+          const err = await writeClipboard(p.blobP);
+          if (!err) { toast('Скопировано в буфер'); return 'copied'; }
+          reason = `Не удалось скопировать (${why(err)})`;
+        }
+        return await deliver(await p.blobP, p.name, reason);
+      } catch (e) {
+        console.error(e);
+        toast('Не удалось создать снимок', 'warn');
+        return null;
+      }
+    });
+  }
+
+  /* ---------- кнопка в шапке ---------- */
+
+  function setMenu(open) {
+    const menu = q('#shotMenu'), btn = q('#btnShot');
+    if (!menu || !btn) return;
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function init() {
+    const btn = q('#btnShot'), menu = q('#shotMenu');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (menu.hidden && !isReady(activeChart())) { toast('График ещё загружается', 'warn'); return; }
+      setMenu(menu.hidden);
+    });
+    menu.addEventListener('click', e => {
+      const b = e.target.closest('[data-act]');
+      if (!b) return;
+      setMenu(false);
+      if (b.dataset.act === 'download') download(); else copy();
+    });
+    // на фазе перехвата: инструменты рисования гасят всплытие, обычный click мог не дойти
+    document.addEventListener('pointerdown', e => {
+      if (!e.target.closest('.shotpick')) setMenu(false);
+    }, true);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { setMenu(false); closeSheet(); }
+    });
+  }
+
+  // смена таймфрейма или монеты: закрываем меню и окно, чтобы старый снимок не висел на экране
+  function reset() { setMenu(false); closeSheet(); }
+
+  document.addEventListener('DOMContentLoaded', init);
+  const api = { build, download, copy, reset, last: null };
+  return api;
+})();
+
+</script>
+<script>
+/* Вкладка «Горячие клавиши»: полная шпаргалка на отдельной странице (не окошко поверх графика).
+   Список берётся из DRAW_HELP, переключатель Mac / Windows меняет подписи клавиш, есть поиск
+   и проверка нажатий: то, что пришло на страницу, видно сразу; если ничего не появилось -
+   сочетание перехватила система или браузер.
+   Открыть: значок клавиатуры в шапке, «?» на графике -> «Открыть вкладкой», адрес с #keys
+   (внутри Telegram адрес не трогаем: там в хэше лежат параметры запуска). */
+const Keys = (() => {
+  let root = null, opened = false, mac = IS_MAC, query = '';
+
+  const tgApp = () => (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) ? window.Telegram.WebApp : null;
+
+  const TAG = { tv: 'как в TradingView', own: 'своё', none: 'только мышью' };
+
+  // человеческое имя основной клавиши по event.code
+  function keyName(e) {
+    const c = e.code || '';
+    if (/^Key[A-Z]$/.test(c)) return c.slice(3);
+    if (/^Digit\d$/.test(c)) return c.slice(5);
+    const map = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Escape: 'Esc', Backspace: 'Backspace',
+                  Delete: 'Delete', Enter: 'Enter', Space: 'Space', Tab: 'Tab', Backquote: '`', Minus: '-', Equal: '=' };
+    return map[c] || c || e.key;
+  }
+
+  // что это сочетание делает в скринере (то же, что разбирает DrawTools._hotkey)
+  function describe(e) {
+    const mod = e.metaKey || e.ctrlKey, c = e.code;
+    if (mod && e.altKey && c === 'KeyH') return 'Спрятать / показать всю разметку';
+    if (mod && !e.altKey) {
+      if (c === 'KeyZ') return 'Отменить последнее действие';
+      if (c === 'KeyC') return 'Копировать выделенный рисунок';
+      if (c === 'KeyV') return 'Вставить рисунок под курсор';
+    }
+    if (e.altKey && !mod) {
+      const hk = DRAW_HOTKEYS.find(h => h.code === c && !!h.shift === e.shiftKey);
+      if (hk) return 'Включить инструмент: ' + (DRAW_NAMES[hk.tool] || hk.tool);
+      if (c === 'KeyH' && e.shiftKey) return 'Спрятать / показать всю разметку (запасное сочетание)';
+      if (c === 'KeyS' && !e.shiftKey) return 'Магнит вкл / выкл';
+      if (c === 'Backspace' || c === 'Delete') return 'Стереть все рисунки на монете';
+    }
+    if (!mod && !e.altKey) {
+      if (c === 'Escape') return 'Вернуться к курсору, закрыть окно, снять выделение';
+      if (c === 'Delete' || c === 'Backspace') return 'Удалить выделенное';
+      if (/^Arrow/.test(c)) return 'Двигать выделенное' + (e.shiftKey ? ' (крупный шаг)' : '');
+      if (c === 'Enter') return 'Закончить траекторию';
+    }
+    return null;
+  }
+
+  function combo(e) {
+    const parts = [];
+    if (e.ctrlKey) parts.push('Ctrl');
+    if (e.altKey) parts.push(mac ? 'Option' : 'Alt');
+    if (e.shiftKey) parts.push('Shift');
+    if (e.metaKey) parts.push(mac ? 'Cmd' : 'Win');
+    if (!/^(Control|Alt|Shift|Meta)/.test(e.code || '')) parts.push(keyName(e));
+    return parts;
+  }
+
+  function listHtml() {
+    const q = query.trim().toLowerCase();
+    let out = '';
+    for (const [title, rows] of DRAW_HELP) {
+      const list = rows.filter(([label, ks]) => !q || label.toLowerCase().includes(q) ||
+        ks.some(k => drawKeyLabel(k, mac).toLowerCase().includes(q)));
+      if (!list.length) continue;
+      out += `<h3>${title}</h3><div class="kp-list">` + list.map(([label, ks, tag]) =>
+        `<div class="kp-row"><span class="kp-l">${label}${tag && tag !== 'none' ? `<em class="kp-tag ${tag}">${TAG[tag]}</em>` : ''}</span>` +
+        `<span class="dh-keys">${drawKeysHtml(ks, mac)}</span></div>`).join('') + '</div>';
+    }
+    return out || '<div class="kp-empty">Ничего не нашлось. Попробуй другое слово: фибо, круг, Option.</div>';
+  }
+
+  function build() {
+    if (root) return;
+    root = document.createElement('section');
+    root.id = 'keysPage';
+    root.hidden = true;
+    root.innerHTML =
+      '<div class="kp-wrap">' +
+        '<div class="kp-top">' +
+          '<button type="button" class="kp-back">← К графику</button>' +
+          '<h2>Горячие клавиши</h2>' +
+          '<div class="kp-os" role="group" aria-label="Система">' +
+            '<button type="button" data-os="mac">Mac</button><button type="button" data-os="win">Windows</button></div>' +
+        '</div>' +
+        '<p class="kp-lead">Клавиши не обязательны: все инструменты есть значками слева на графике, кликни и рисуй. ' +
+          'Сочетания те же, что в TradingView (плашка «как в TradingView»), кроме отмеченных «своё».</p>' +
+        '<input class="kp-search" type="search" placeholder="Найти: фибо, круг, Option, удалить…" autocomplete="off" spellcheck="false">' +
+        '<div class="kp-body"></div>' +
+        '<h3>Проверка клавиш</h3>' +
+        '<div class="kp-test" tabindex="0" role="textbox" aria-readonly="true">' +
+          '<div class="kp-hint">Кликни сюда и нажми любое сочетание. Так видно, дошла ли клавиша до страницы.</div>' +
+          '<div class="kp-combo"></div><div class="kp-info"></div><div class="kp-verdict"></div>' +
+        '</div>' +
+        '<h3>Если сочетание не срабатывает</h3>' +
+        '<ul class="kp-notes">' +
+          '<li>Option на Mac и есть Alt: везде, где написано Alt, жми Option. Буква, которую Option печатает, в скринере не появится.</li>' +
+          '<li>Нажал, а в проверке выше пусто: сочетание перехватила система или браузер. Тот же инструмент включается значком слева.</li>' +
+          '<li>Cmd+Option+H в macOS ещё и «Скрыть остальные» окна. Если сработало оно, а разметка на месте, прячь её запасным Shift+Option+H или значком глаза на панели.</li>' +
+          '<li>Правый клик на трекпаде: касание двумя пальцами (Системные настройки, Трекпад) или Ctrl+клик. Ещё меню рисунка открывает кнопка ⋮ на его панели.</li>' +
+          '<li>Клавиши работают, пока фокус в окне с графиком: кликни по графику, если печатал в поиске монет.</li>' +
+        '</ul>' +
+      '</div>';
+    document.body.appendChild(root);
+
+    root.querySelector('.kp-back').addEventListener('click', () => show(false));
+    root.querySelector('.kp-os').addEventListener('click', e => {
+      const b = e.target.closest('[data-os]');
+      if (!b) return;
+      mac = b.dataset.os === 'mac';
+      render();
+    });
+    root.querySelector('.kp-search').addEventListener('input', e => { query = e.target.value; render(); });
+
+    const test = root.querySelector('.kp-test');
+    test.addEventListener('keydown', e => {
+      if (e.repeat) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const parts = combo(e);
+      test.querySelector('.kp-hint').hidden = true;
+      test.querySelector('.kp-combo').innerHTML = parts.map(k => `<kbd>${k}</kbd>`).join('<i>+</i>');
+      const mods = [['ctrlKey', 'Ctrl'], ['altKey', 'Alt/Option'], ['shiftKey', 'Shift'], ['metaKey', 'Cmd/Win']]
+        .filter(([k]) => e[k]).map(([, n]) => n).join(' + ') || 'нет';
+      test.querySelector('.kp-info').textContent = `код: ${e.code} · символ: ${e.key === ' ' ? 'пробел' : e.key} · модификаторы: ${mods}`;
+      const what = describe(e);
+      const v = test.querySelector('.kp-verdict');
+      v.className = 'kp-verdict ' + (what ? 'ok' : 'none');
+      v.textContent = what ? `Дошло до страницы. В скринере: ${what}` : 'Дошло до страницы, но такого сочетания в скринере нет';
+    });
+    test.addEventListener('blur', () => { test.classList.remove('armed'); });
+    test.addEventListener('focus', () => { test.classList.add('armed'); });
+
+    // Esc закрывает вкладку, если не печатаем в проверке или поиске
+    window.addEventListener('keydown', e => {
+      if (!opened || e.key !== 'Escape') return;
+      if (document.activeElement && (document.activeElement.closest('.kp-test') || document.activeElement.classList.contains('kp-search'))) return;
+      show(false);
+    });
+    window.addEventListener('hashchange', () => show(location.hash === '#keys'));
+    window.addEventListener('resize', () => {
+      if (opened) root.style.top = (document.querySelector('header') || { offsetHeight: 0 }).offsetHeight + 'px';
+    });
+  }
+
+  function render() {
+    root.querySelectorAll('.kp-os button').forEach(b => b.classList.toggle('on', (b.dataset.os === 'mac') === mac));
+    root.querySelector('.kp-body').innerHTML = listHtml();
+  }
+
+  function show(v) {
+    build();
+    if (v === opened) return;
+    opened = v;
+    root.hidden = !v;
+    if (v) root.style.top = (document.querySelector('header') || { offsetHeight: 0 }).offsetHeight + 'px';
+    document.body.classList.toggle('keys-open', v);
+    const btn = document.getElementById('btnKeys');
+    if (btn) btn.classList.toggle('active', v);
+    const tg = tgApp();
+    try {
+      if (tg && tg.BackButton) {   // в Telegram закрываем стрелкой «назад» в шапке
+        if (!Keys._back) Keys._back = () => show(false);
+        if (v) { tg.BackButton.onClick(Keys._back); tg.BackButton.show(); }
+        else { tg.BackButton.offClick(Keys._back); tg.BackButton.hide(); }
+      } else if (v && location.hash !== '#keys') {
+        location.hash = '#keys';
+      } else if (!v && location.hash === '#keys') {
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+    } catch (e) {}
+    if (v) { render(); root.scrollTop = 0; }
+  }
+
+  function init() {
+    build();   // слушатель hashchange нужен сразу: ссылку с #keys могут открыть в уже загруженной странице
+    const btn = document.getElementById('btnKeys');
+    if (btn) btn.addEventListener('click', () => show(!opened));
+    const tg = tgApp();
+    let start = '';
+    try { start = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || ''; } catch (e) {}
+    if (location.hash === '#keys' || start === 'keys') show(true);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  return { init, show, isOpen: () => opened };
+})();
 
 </script>
 <script>
@@ -3008,6 +4828,7 @@ function renderSidebar() {
 
 /* ---------- графики ---------- */
 function selectSymbol(sym) {
+  if (typeof Shot !== 'undefined') Shot.reset();
   state.symbol = sym;
   renderSidebar();
   $('#curSym').textContent = sym;
@@ -3100,6 +4921,7 @@ function setStatus(msg, err = false) {
 
 /* ---------- инициализация ---------- */
 function setMode(mode) {
+  if (typeof Shot !== 'undefined') Shot.reset();   // окно со снимком прошлого ТФ закрываем
   state.mode = mode;
   $('#curTf').textContent = TF_CFG[mode].label;
   tfMenu(false);
