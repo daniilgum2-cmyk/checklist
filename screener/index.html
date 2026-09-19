@@ -4086,27 +4086,42 @@ const Shot = (() => {
 
     const platform = tg ? tg.platform : '';
     const mobile = ['ios', 'android', 'android_x'].includes(platform);
+    // Файл можно сохранить ссылкой-скачиванием только там, где это доказанно работает. Проверено на
+    // Telegram Lite (Mac, платформа tdesktop): клик по <a download> и «Download Image» из меню картинки
+    // молча ничего не сохраняют (WebView Telegram не обрабатывает загрузки), поэтому там кнопку не даём.
+    const canDownload = ['weba', 'webk', 'unigram'].includes(platform);
+    const file = new File([blob], name, { type: 'image/png' });
+    let canShare = false;
+    try { canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) {}
     sheet.querySelector('.ss-hint').textContent = mobile
       ? 'Нажми на картинку и удерживай, затем выбери «Сохранить изображение» или «Поделиться».'
-      : 'Скопируй снимок и вставь в чат, либо сохрани правым кликом по картинке.';
+      : canDownload
+        ? 'Скопируй снимок и вставь в чат, либо скачай файлом.'
+        : 'Скопируй снимок и вставь в чат или пост. Telegram на компьютере не даёт мини-приложениям сохранять файлы.';
 
     const btns = sheet.querySelector('.ss-btns');
     btns.innerHTML = '';
-    if (clipboardOK()) {
+    const add = (label, fn) => {
       const b = document.createElement('button');
-      b.type = 'button'; b.textContent = 'Скопировать';
-      b.addEventListener('click', async () => {
+      b.type = 'button'; b.textContent = label;
+      b.addEventListener('click', fn);
+      btns.appendChild(b);
+    };
+    if (clipboardOK()) {
+      add('Скопировать', async () => {
         const err = await writeClipboard(Promise.resolve(blob));
         if (err) toast(`Не удалось скопировать (${why(err)})`, 'warn'); else toast('Скопировано в буфер');
       });
-      btns.appendChild(b);
     }
-    // Ссылку-скачивание даём только там, где WebView это переживает (не WKWebView и не Android WebView)
-    if (['tdesktop', 'weba', 'webk', 'unigram'].includes(platform)) {
-      const b = document.createElement('button');
-      b.type = 'button'; b.textContent = 'Скачать файл';
-      b.addEventListener('click', () => { anchorDownload(blob, name); toast('Снимок сохранён'); });
-      btns.appendChild(b);
+    // Системное «Поделиться» (на Mac: AirDrop, Почта, Сообщения, Заметки): из кнопки, то есть по свежему нажатию
+    if (canShare) {
+      add('Поделиться…', async () => {
+        try { await navigator.share({ files: [file], title: 'GMV TRADES' }); }
+        catch (e) { if (!e || e.name !== 'AbortError') toast('Не удалось открыть «Поделиться»', 'warn'); }
+      });
+    }
+    if (canDownload) {
+      add('Скачать файл', () => { anchorDownload(blob, name); toast('Снимок сохранён'); });
     }
     sheet.hidden = false;
   }
