@@ -149,7 +149,7 @@ code { font: 0.92em ui-monospace, Menlo, monospace; background: #21262d; padding
 
   /* ---------- где лежат тексты ---------- */
   const DIR = 'strategies/';                 // папка рядом со страницей, один файл на стратегию
-  const EXT = /\.(txt|md)$/i;
+  const EXT = /\.txt$/i;                    // именно .txt: GitHub Pages превращает .md в HTML-страницы, а .txt отдаёт как есть
   const CACHE_KEY = 'gmv_strategies_v1';
 
   /* ---------- Telegram ---------- */
@@ -352,7 +352,9 @@ code { font: 0.92em ui-monospace, Menlo, monospace; background: #21262d; padding
 
   async function refresh() {
     const names = await listNames();
-    const files = await Promise.all(names.map(async name => ({ name, text: await get(DIR + encodeURIComponent(name)) })));
+    // битый или ещё не выложенный файл не должен ронять весь список: пропускаем его
+    const files = (await Promise.all(names.map(name => get(DIR + encodeURIComponent(name)).then(text => ({ name, text }), () => null)))).filter(Boolean);
+    if (names.length && !files.length) throw new Error('файлы стратегий не загрузились');
     const key = files => JSON.stringify(files.map(f => [f.name, f.text]).sort());
     const changed = key(files) !== key(items.map(i => ({ name: i.name, text: i.text })));
     if (changed || !loaded) { items = build(files); writeCache(files); }
