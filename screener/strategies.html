@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Telegram Mini App кэширует страницу: просим не держать старую версию -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Стратегии · GMV TRADES</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* Справочник по стратегиям: список карточек и чтение одной стратегии.
+   Тексты лежат отдельными файлами в папке strategies/ (см. README), в код ничего не зашито. */
+:root {
+  --bg: #0d1117; --panel: #161b22; --panel-hi: #1c2230; --line: #21262d; --line2: #30363d;
+  --text: #c9d1d9; --strong: #e6edf3; --muted: #8b949e;
+  --accent: #58a6ff; --accent-bg: rgba(47, 129, 247, 0.12);
+  --warn: #d29922; --warn-bg: rgba(210, 153, 34, 0.13);
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.55 var(--sans); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+  /* длинные слова и ссылки переносятся, а не растягивают страницу за экран */
+  overflow-wrap: anywhere;
+}
+a { color: var(--accent); }
+
+.top {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  background: rgba(13, 17, 23, 0.92); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.top .brand { font-weight: 700; color: var(--strong); font-size: 14px; }
+.top .brand span { color: var(--muted); font-weight: 400; margin-left: 4px; }
+.back {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: auto;
+  padding: 6px 11px; border: 1px solid var(--line2); border-radius: 7px; background: #21262d;
+  color: var(--strong); font-size: 12.5px; text-decoration: none; white-space: nowrap;
+}
+.back:hover { border-color: var(--accent); }
+/* внутри Telegram возвращаются нативной стрелкой в шапке, свою ссылку прячем */
+.in-tg .back, .in-tg .crumb { display: none; }
+
+main { max-width: 760px; margin: 0 auto; padding: 18px 16px calc(44px + env(safe-area-inset-bottom)); min-width: 0; }
+h1 { margin: 2px 0 6px; font-size: 24px; line-height: 1.25; color: var(--strong); }
+.lead { margin: 0 0 4px; color: var(--muted); font-size: 14px; }
+
+/* --- список --- */
+.cards { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+.card {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+  padding: 14px 14px 14px 16px; background: var(--panel); border: 1px solid var(--line2); border-radius: 12px;
+  color: inherit; text-decoration: none;
+}
+.card:hover { border-color: var(--accent); }
+.card:active { background: var(--panel-hi); }
+.card .txt { flex: 1; min-width: 0; }
+.card h2 { margin: 0 0 3px; font-size: 16px; line-height: 1.3; color: var(--strong); }
+.card p {
+  margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card .chev { flex: none; color: var(--muted); font-size: 24px; line-height: 1; }
+
+/* --- открытая стратегия --- */
+.crumb { display: inline-block; margin: 0 0 8px; font-size: 13px; text-decoration: none; }
+.goal {
+  margin: 8px 0 14px; padding: 12px 14px; border-left: 3px solid var(--accent);
+  background: var(--accent-bg); border-radius: 8px;
+}
+.goal strong { color: var(--strong); }
+.tools { display: flex; gap: 8px; margin: 0 0 12px; }
+.tools button {
+  padding: 6px 12px; border: 1px solid var(--line2); border-radius: 7px; background: #21262d;
+  color: var(--muted); font: 12.5px var(--sans); cursor: pointer;
+}
+.tools button:hover { color: var(--strong); border-color: var(--accent); }
+
+.sec { margin: 0 0 10px; background: var(--panel); border: 1px solid var(--line2); border-radius: 12px; overflow: hidden; }
+.sec > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 13px 14px; -webkit-user-select: none; user-select: none;
+}
+.sec > summary::-webkit-details-marker { display: none; }
+.sec > summary h2 { margin: 0; flex: 1; min-width: 0; font-size: 16px; line-height: 1.3; color: var(--strong); }
+.sec > summary::after {
+  content: ""; flex: none; width: 8px; height: 8px; margin: 0 2px 3px 0;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 0.15s;
+}
+.sec[open] > summary::after { transform: rotate(-135deg); margin-bottom: -3px; }
+.sec-body { padding: 0 16px 14px; }
+.sec-body > :first-child { margin-top: 2px; }
+.sec-body p { margin: 10px 0; }
+.sec-body strong { color: var(--strong); }
+.sec-body h3 { margin: 18px 0 4px; font-size: 15px; line-height: 1.35; color: var(--strong); }
+.sec-body hr { border: 0; border-top: 1px solid var(--line2); margin: 14px 0; }
+.sec-body ul, .sec-body ol { list-style: none; margin: 8px 0; padding: 0; counter-reset: n; }
+.sec-body li { position: relative; margin: 9px 0; padding-left: 20px; }
+.sec-body ul > li::before {
+  content: ""; position: absolute; left: 3px; top: 0.66em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+}
+.sec-body ol > li { counter-increment: n; padding-left: 26px; }
+.sec-body ol > li::before { content: counter(n) "."; position: absolute; left: 0; top: 0; width: 20px; text-align: right; color: var(--accent); font-weight: 600; }
+.sec-body li > p { margin: 7px 0 0; }
+.sec-body li > ul, .sec-body li > ol { margin: 6px 0 0; }
+.callout {
+  margin: 12px 0; padding: 11px 14px; border-left: 3px solid var(--accent);
+  background: var(--accent-bg); border-radius: 8px;
+}
+.callout.warn { border-left-color: var(--warn); background: var(--warn-bg); }
+.callout p { margin: 6px 0; }
+.callout p:first-child { margin-top: 0; }
+.callout p:last-child { margin-bottom: 0; }
+code { font: 0.92em ui-monospace, Menlo, monospace; background: #21262d; padding: 1px 5px; border-radius: 4px; }
+
+/* --- служебные состояния --- */
+.state { margin: 28px 0; padding: 22px 16px; text-align: center; color: var(--muted); border: 1px dashed var(--line2); border-radius: 12px; }
+.state button {
+  margin-top: 12px; padding: 8px 16px; border: 1px solid var(--line2); border-radius: 8px; background: #21262d;
+  color: var(--strong); font: 13px var(--sans); cursor: pointer;
+}
+.skeleton { height: 66px; margin-top: 10px; border-radius: 12px; background: linear-gradient(90deg, #161b22, #1c2230, #161b22); background-size: 200% 100%; animation: sh 1.2s linear infinite; }
+@keyframes sh { to { background-position: -200% 0; } }
+
+@media (min-width: 640px) {
+  main { padding-top: 26px; }
+  h1 { font-size: 28px; }
+  .sec-body { padding: 0 20px 16px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">GMV TRADES <span>Стратегии</span></div>
+  <a class="back" id="backLink" href="./">← Скринер</a>
+</header>
+<main id="app" aria-live="polite"></main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- где лежат тексты ---------- */
+  const DIR = 'strategies/';                 // папка рядом со страницей, один файл на стратегию
+  const EXT = /\.(txt|md)$/i;
+  const CACHE_KEY = 'gmv_strategies_v1';
+
+  /* ---------- Telegram ---------- */
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const inTg = !!(tg && tg.platform && tg.platform !== 'unknown');
+  if (inTg) {
+    document.documentElement.classList.add('in-tg');
+    try {
+      tg.ready();
+      tg.expand();
+      if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+      if (tg.setHeaderColor) tg.setHeaderColor('#0d1117');
+      if (tg.setBackgroundColor) tg.setBackgroundColor('#0d1117');
+    } catch (e) {}
+  }
+
+  /* ---------- разбор текста стратегии (маленький Markdown) ----------
+     # Заголовок             первая строка: название
+     > **Цель:** ...         первая цитата под названием: короткое описание (карточка и «лид»)
+     ## Раздел               сворачиваемый раздел
+     ### Подзаголовок        внутри раздела
+     - пункт / 1. пункт      список; строка с отступом в 2 пробела продолжает пункт (после пустой строки - новым абзацем)
+     > текст                 плашка; > [!warn] текст - жёлтая плашка
+     **жирный**, *курсив*, `код`, [ссылка](https://...), --- линия */
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function inline(src) {
+    let s = esc(src);
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    s = s.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\w)/g, '$1<em>$2</em>');
+    return s;
+  }
+  const plain = s => String(s).replace(/`/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\*+/g, '').trim();
+
+  const RE_ITEM = /^(\s*)([-*+]|\d+[.)])\s+(\S.*)$/;
+  const RE_BLOCK = /^(#{1,3}\s|>|\s*([-*+]|\d+[.)])\s+\S|(-{3,}|\*{3,}|_{3,})\s*$)/;
+
+  function parse(text, fallbackTitle) {
+    const lines = String(text).replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
+    const doc = { title: '', summary: '', intro: [], sections: [] };
+    let cur = null, i = 0;
+    const out = () => (cur ? cur.blocks : doc.intro);
+    const blank = l => !l.trim();
+
+    while (i < lines.length) {
+      const line = lines[i];
+      if (blank(line)) { i++; continue; }
+      let m;
+
+      if (!doc.title && !cur && (m = /^#\s+(.+?)\s*#*\s*$/.exec(line))) { doc.title = m[1]; i++; continue; }
+      if ((m = /^##\s+(.+?)\s*#*\s*$/.exec(line))) { cur = { title: m[1], blocks: [] }; doc.sections.push(cur); i++; continue; }
+      if ((m = /^###\s+(.+?)\s*#*\s*$/.exec(line))) { out().push({ t: 'h3', text: m[1] }); i++; continue; }
+      if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { out().push({ t: 'hr' }); i++; continue; }
+
+      if (/^>/.test(line)) {                       // цитата: плашка (первая под названием - описание стратегии)
+        const q = [];
+        while (i < lines.length && /^>/.test(lines[i])) { q.push(lines[i].replace(/^>\s?/, '')); i++; }
+        let body = q.join('\n').trim(), kind = 'note';
+        const k = /^\[!([^\]]+)\]\s*/.exec(body);
+        if (k) { kind = /^(warn|warning|caution|внимание|важно)$/i.test(k[1].trim()) ? 'warn' : 'note'; body = body.slice(k[0].length); }
+        if (!doc.summary && !cur && doc.title) doc.summary = body; else out().push({ t: 'callout', kind, text: body });
+        continue;
+      }
+
+      if ((m = RE_ITEM.exec(line)) && m[1].length < 2) {   // список
+        const ordered = /\d/.test(m[2]);
+        const items = [];
+        let sawBlank = false;
+        while (i < lines.length) {
+          const l = lines[i];
+          const li = RE_ITEM.exec(l);
+          if (li && li[1].length < 2 && /\d/.test(li[2]) === ordered) { items.push({ p: [li[3]], sub: [] }); sawBlank = false; i++; continue; }
+          if (!items.length) break;
+          if (li && li[1].length >= 2) { items[items.length - 1].sub.push(li[3]); sawBlank = false; i++; continue; }   // вложенный пункт
+          if (/^\s{2,}\S/.test(l)) {                                                                                 // продолжение пункта
+            const it = items[items.length - 1], t = l.trim();
+            if (sawBlank || it.sub.length) it.p.push(t); else it.p[it.p.length - 1] += ' ' + t;
+            sawBlank = false; i++; continue;
+          }
+          if (blank(l)) {                     // пустая строка не рвёт список, если дальше отступ или новый пункт
+            let j = i; while (j < lines.length && blank(lines[j])) j++;
+            const nx = lines[j];
+            if (nx !== undefined && (/^\s{2,}\S/.test(nx) || (RE_ITEM.exec(nx) && RE_ITEM.exec(nx)[1].length < 2))) { sawBlank = true; i = j; continue; }
+          }
+          break;
+        }
+        out().push({ t: ordered ? 'ol' : 'ul', items });
+        continue;
+      }
+
+      const buf = [];                                    // абзац: подряд идущие строки склеиваем
+      while (i < lines.length && !blank(lines[i]) && !(buf.length && RE_BLOCK.test(lines[i]))) { buf.push(lines[i].trim()); i++; }
+      if (!buf.length) { buf.push(line.trim()); i++; }
+      out().push({ t: 'p', text: buf.join(' ') });
+    }
+
+    if (!doc.title) doc.title = fallbackTitle;
+    if (!doc.summary) {                                  // описания нет - берём первый абзац
+      const p = [...doc.intro, ...doc.sections.flatMap(s => s.blocks)].find(b => b.t === 'p');
+      if (p) doc.summary = p.text;
+    }
+    return doc;
+  }
+
+  /* ---------- вывод ---------- */
+  function paras(text) { return String(text).split(/\n{2,}/).map(x => `<p>${inline(x.replace(/\n/g, ' '))}</p>`).join(''); }
+
+  function blocks(list) {
+    return list.map(b => {
+      switch (b.t) {
+        case 'p': return `<p>${inline(b.text)}</p>`;
+        case 'h3': return `<h3>${inline(b.text)}</h3>`;
+        case 'hr': return '<hr>';
+        case 'callout': return `<div class="callout ${b.kind}">${paras(b.text)}</div>`;
+        default: {
+          const tag = b.t;
+          return `<${tag}>` + b.items.map(it =>
+            '<li>' + inline(it.p[0]) + it.p.slice(1).map(x => `<p>${inline(x)}</p>`).join('') +
+            (it.sub.length ? '<ul>' + it.sub.map(x => `<li>${inline(x)}</li>`).join('') + '</ul>' : '') + '</li>').join('') + `</${tag}>`;
+        }
+      }
+    }).join('');
+  }
+
+  const app = document.getElementById('app');
+
+  function viewList(items) {
+    document.title = 'Стратегии · GMV TRADES';
+    if (!items.length) {
+      app.innerHTML = '<h1>Стратегии</h1><div class="state">Стратегии пока не добавлены.</div>';
+      return;
+    }
+    app.innerHTML =
+      '<h1>Стратегии</h1><p class="lead">Справочник: критерии отбора, входа и выхода. Открой карточку, чтобы прочитать полностью.</p>' +
+      '<ul class="cards">' + items.map(it =>
+        `<li><a class="card" href="?s=${encodeURIComponent(it.slug)}" data-slug="${esc(it.slug)}">` +
+        `<div class="txt"><h2>${inline(it.doc.title)}</h2>${it.doc.summary ? `<p>${esc(plain(it.doc.summary))}</p>` : ''}</div>` +
+        '<span class="chev" aria-hidden="true">›</span></a></li>').join('') + '</ul>';
+  }
+
+  function viewDoc(it) {
+    const d = it.doc;
+    document.title = d.title + ' · Стратегии';
+    const long = d.sections.length > 8;                 // очень длинный текст: раскрыт только первый раздел
+    app.innerHTML =
+      '<a class="crumb" href="./strategies.html" data-act="list">← Все стратегии</a>' +
+      `<article class="doc"><h1>${inline(d.title)}</h1>` +
+      (d.summary ? `<div class="goal">${paras(d.summary)}</div>` : '') +
+      (d.intro.length ? `<div class="intro">${blocks(d.intro)}</div>` : '') +
+      (d.sections.length > 1 ? '<div class="tools"><button type="button" data-act="fold">Свернуть все</button><button type="button" data-act="unfold">Развернуть все</button></div>' : '') +
+      d.sections.map((s, k) =>
+        `<details class="sec"${!long || k === 0 ? ' open' : ''}><summary><h2>${inline(s.title)}</h2></summary><div class="sec-body">${blocks(s.blocks)}</div></details>`).join('') +
+      '</article>';
+  }
+
+  function viewState(html) { app.innerHTML = html; }
+
+  /* ---------- данные: список файлов, тексты, кэш ---------- */
+  let items = [];                 // [{ slug, name, text, doc }] по порядку имён файлов
+  let loaded = false;             // хоть один вариант данных (кэш или сеть) уже есть
+  let failed = false;
+
+  const bucket = () => Math.floor(Date.now() / 120000);      // ключ на 2 минуты: обходим кэш CDN, но не долбим сервер
+  async function get(url, json) {
+    const r = await fetch(url + (url.indexOf('?') < 0 ? '?' : '&') + 'v=' + bucket(), { cache: 'no-cache' });
+    if (!r.ok) throw new Error(url + ' ' + r.status);
+    return json ? r.json() : r.text();
+  }
+
+  // Список файлов. 1) strategies/list.json: GitHub Pages собирает его сам из содержимого папки;
+  // 2) запасной путь: API GitHub (репозиторий берём из адреса страницы); локально список отдаёт server.py
+  async function listNames() {
+    try {
+      const j = await get(DIR + 'list.json', true);
+      if (Array.isArray(j)) return j.filter(n => typeof n === 'string' && EXT.test(n));
+    } catch (e) { /* файла нет или это ещё «сырой» шаблон: идём дальше */ }
+    const host = /^([^.]+)\.github\.io$/.exec(location.hostname);
+    const parts = location.pathname.split('/').filter(Boolean);            // ['checklist', 'screener', 'strategies.html']
+    if (!host || parts.length < 2) throw new Error('нет списка файлов');
+    const path = parts.slice(1, -1).concat(DIR.replace(/\/$/, '')).join('/');
+    const r = await fetch(`https://api.github.com/repos/${host[1]}/${parts[0]}/contents/${path}`, { headers: { Accept: 'application/vnd.github+json' } });
+    const j = await r.json();
+    if (!Array.isArray(j)) throw new Error('API GitHub: ' + (j && j.message));
+    return j.filter(f => f.type === 'file' && EXT.test(f.name)).map(f => f.name);
+  }
+
+  const slugOf = name => name.replace(/\.[^.]+$/, '');
+  const byName = (a, b) => a.name.localeCompare(b.name, 'ru', { numeric: true });
+  function build(files) {
+    return files.map(f => ({ slug: slugOf(f.name), name: f.name, text: f.text,
+                             doc: parse(f.text, slugOf(f.name).replace(/^\d+[-_.]?/, '').replace(/[-_]+/g, ' ')) })).sort(byName);
+  }
+
+  function readCache() {
+    try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); return c && Array.isArray(c.files) ? c.files : null; } catch (e) { return null; }
+  }
+  function writeCache(files) { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), files })); } catch (e) {} }
+
+  async function refresh() {
+    const names = await listNames();
+    const files = await Promise.all(names.map(async name => ({ name, text: await get(DIR + encodeURIComponent(name)) })));
+    const key = files => JSON.stringify(files.map(f => [f.name, f.text]).sort());
+    const changed = key(files) !== key(items.map(i => ({ name: i.name, text: i.text })));
+    if (changed || !loaded) { items = build(files); writeCache(files); }
+    loaded = true; failed = false;
+    return changed;
+  }
+
+  /* ---------- экраны и навигация ---------- */
+  let view = 'list', openedFromList = false;
+
+  function currentSlug() { return new URLSearchParams(location.search).get('s'); }
+
+  function route() {
+    const slug = currentSlug();
+    if (!loaded) {
+      viewState(failed
+        ? '<div class="state">Не удалось загрузить стратегии.<br><button type="button" data-act="retry">Повторить</button></div>'
+        : '<h1>Стратегии</h1><div class="skeleton"></div><div class="skeleton"></div>');
+      view = 'list';
+    } else if (slug) {
+      const it = items.find(x => x.slug === slug);
+      if (it) { viewDoc(it); view = 'doc'; }
+      else { viewState('<div class="state">Такой стратегии нет.<br><button type="button" data-act="list">К списку</button></div>'); view = 'list'; }
+    } else { viewList(items); view = 'list'; }
+    syncBack();
+  }
+
+  function openDoc(slug) {
+    history.pushState({ s: slug }, '', '?s=' + encodeURIComponent(slug));
+    openedFromList = true;
+    route();
+    window.scrollTo(0, 0);
+  }
+  function showList(replace) {
+    history[replace ? 'replaceState' : 'pushState']({}, '', location.pathname);
+    route();
+    window.scrollTo(0, 0);
+  }
+  function goBack() {
+    if (view === 'doc') { if (openedFromList) history.back(); else showList(true); }
+    else location.href = './';                        // со списка - назад в скринер
+  }
+  function syncBack() {
+    if (inTg && tg.BackButton) { try { tg.BackButton.show(); } catch (e) {} }
+  }
+  if (inTg && tg.BackButton) { try { tg.BackButton.onClick(goBack); tg.BackButton.show(); } catch (e) {} }
+
+  window.addEventListener('popstate', () => { if (!currentSlug()) openedFromList = false; route(); });
+
+  app.addEventListener('click', e => {
+    const card = e.target.closest('a.card');
+    if (card) { e.preventDefault(); openDoc(card.dataset.slug); return; }
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const act = b.dataset.act;
+    if (act === 'list') { e.preventDefault(); if (openedFromList && currentSlug()) history.back(); else showList(true); }
+    else if (act === 'fold' || act === 'unfold') app.querySelectorAll('details.sec').forEach(d => { d.open = act === 'unfold'; });
+    else if (act === 'retry') start();
+  });
+
+  /* ---------- старт: сначала сохранённая копия (мгновенно), потом свежие данные ---------- */
+  async function start() {
+    const cached = readCache();
+    if (cached && !loaded) { items = build(cached); loaded = true; }
+    route();
+    try {
+      const changed = await refresh();
+      if (changed) route();
+    } catch (e) {
+      console.error(e);
+      if (!loaded) { failed = true; route(); }
+    }
+  }
+  start();
+})();
+</script>
+</body>
+</html>
