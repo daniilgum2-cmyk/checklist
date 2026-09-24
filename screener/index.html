@@ -997,11 +997,34 @@ footer {
   .hdrbtn.wide { width: auto; padding: 0 12px; font-size: 13px; }
 }
 
+/* вкладки выбора биржи (фьючерсы): Bybit | Binance */
+.expick {
+  display: flex; gap: 2px; padding: 2px;
+  background: #0d1117; border: 1px solid #30363d; border-radius: 9px;
+}
+.expick button {
+  padding: 5px 15px; border: 0; border-radius: 7px; background: transparent;
+  color: #8b949e; font: 600 12.5px -apple-system, "Segoe UI", Roboto, sans-serif; cursor: pointer;
+}
+.expick button:hover { color: #e6edf3; }
+.expick button.on { background: rgba(31, 111, 235, 0.22); color: #e6edf3; box-shadow: inset 0 0 0 1px #1f6feb; }
+@media (max-width: 760px) {
+  /* на телефоне вкладки идут отдельной строкой под названием, во всю ширину */
+  .expick { order: 1; flex: 1 0 100%; }
+  .expick button { flex: 1; padding: 9px 12px; font-size: 14px; }
+  .hdrbtns { order: 2; }
+  .controls { order: 3; }
+}
+
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">SMC-скринер <span class="sub">Bybit Futures</span></div>
+  <div class="brand">SMC-скринер <span class="sub" id="brandSub">Bybit Futures</span></div>
+  <div class="expick" role="tablist" aria-label="Биржа (фьючерсы)">
+    <button type="button" role="tab" data-ex="bybit" class="on" aria-selected="true">Bybit</button>
+    <button type="button" role="tab" data-ex="binance" aria-selected="false">Binance</button>
+  </div>
   <div class="hdrbtns">
     <nav class="tfpick">
       <button id="btnTf" type="button" aria-haspopup="true" aria-expanded="false" title="Таймфрейм"><span id="curTf">15M</span><i>▾</i></button>
@@ -1077,58 +1100,135 @@ footer {
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
-/* Bybit v5 API через локальный прокси */
+/* Биржевые API для USDT-фьючерсов: Bybit v5 и Binance USDⓈ-M.
+   Наружу обе отдают ОДИНАКОВУЮ форму данных (нормализация внутри), поэтому остальной код не знает,
+   с какой биржей говорит. Локально запросы идут через server.py (прокси), в облаке (GitHub Pages,
+   Telegram) - напрямую: у обеих бирж CORS открыт. Текущая биржа: API.ex ('bybit' | 'binance'). */
+const EXCHANGES = {
+  bybit:   { id: 'bybit',   name: 'Bybit',   local: '/bybit',   cloud: 'https://api.bybit.com' },
+  binance: { id: 'binance', name: 'Binance', local: '/binance', cloud: 'https://fapi.binance.com' },
+};
+
 const API = {
-  // локально (server.py, порт 8737) - через прокси, в облаке - напрямую в Bybit
-  base: location.port === '8737' ? '/bybit' : 'https://api.bybit.com',
-  async get(path, params) {
+  ex: 'bybit',
+
+  setExchange(id) { if (EXCHANGES[id]) this.ex = id; },
+  get exName() { return EXCHANGES[this.ex].name; },
+
+  // локально (server.py, порт 8737) - через прокси, в облаке - напрямую
+  base(ex) { const e = EXCHANGES[ex || this.ex]; return location.port === '8737' ? e.local : e.cloud; },
+
+  // время свечей - секунды, сдвинутые в локальный пояс (так их рисует график)
+  _shift() { return -new Date().getTimezoneOffset() * 60; },
+
+  /* ---------- Bybit ---------- */
+  async _bb(path, params) {
     const qs = new URLSearchParams(params).toString();
-    const r = await fetch(`${API.base}${path}?${qs}`);
+    const r = await fetch(`${this.base('bybit')}${path}?${qs}`);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     if (j.retCode !== 0) throw new Error(j.retMsg || 'ошибка API');
     return j.result;
   },
 
-  async tickers() {
-    return (await this.get('/v5/market/tickers', { category: 'linear' })).list;
+  /* ---------- Binance ---------- */
+  async _bn(path, params) {
+    const qs = new URLSearchParams(params || {}).toString();
+    let r;
+    try { r = await fetch(`${this.base('binance')}${path}${qs ? '?' + qs : ''}`); }
+    catch (e) { throw new Error('Binance недоступен (нет связи или сеть его блокирует)'); }
+    if (r.status === 451 || r.status === 403) throw new Error('Binance недоступен из твоей сети или региона (HTTP ' + r.status + ')');
+    let j = null;
+    try { j = await r.json(); } catch (e) { /* не JSON */ }
+    if (!r.ok) throw new Error((j && j.msg) || 'Binance: HTTP ' + r.status);
+    return j;
   },
 
-  // свечи приходят от новых к старым — разворачиваем; время в секундах, сдвинутое в локальный пояс
+  /* ---------- общее ---------- */
+
+  // все USDT-перпетуалы: [{ symbol, lastPrice, price24hPcnt (доля), highPrice24h, lowPrice24h, turnover24h,
+  // fundingRate, openInterestValue }]. У Binance открытый интерес отдельным запросом по монете,
+  // в общем списке его нет: там null, значение дотягивает openInterestUsd()
+  async tickers() {
+    if (this.ex === 'bybit') return (await this._bb('/v5/market/tickers', { category: 'linear' })).list;
+    const [tk, pi] = await Promise.all([this._bn('/fapi/v1/ticker/24hr'), this._bn('/fapi/v1/premiumIndex')]);
+    const fr = new Map(pi.map(p => [p.symbol, +p.lastFundingRate]));
+    return tk
+      // квартальные контракты называются BTCUSDT_260925, их отбрасываем
+      .filter(t => t.symbol.endsWith('USDT') && !t.symbol.includes('_'))
+      .map(t => ({
+        symbol: t.symbol,
+        lastPrice: t.lastPrice,
+        price24hPcnt: +t.priceChangePercent / 100,
+        highPrice24h: t.highPrice,
+        lowPrice24h: t.lowPrice,
+        turnover24h: t.quoteVolume,
+        fundingRate: fr.has(t.symbol) ? fr.get(t.symbol) : 0,
+        openInterestValue: null,
+      }));
+  },
+
+  // открытый интерес в долларах для одной монеты (только Binance: у Bybit он уже в списке тикеров)
+  async openInterestUsd(symbol, price) {
+    const r = await this._bn('/fapi/v1/openInterest', { symbol });
+    return +r.openInterest * price;
+  },
+
+  // свечи от старых к новым; interval - как в TF_CFG ('1','5','15','60','240','D')
   async klines(symbol, interval, limit = 400) {
-    const res = await this.get('/v5/market/kline', { category: 'linear', symbol, interval, limit });
-    const shift = -new Date().getTimezoneOffset() * 60;
-    return res.list.map(r => ({
+    const shift = this._shift();
+    if (this.ex === 'bybit') {
+      const res = await this._bb('/v5/market/kline', { category: 'linear', symbol, interval, limit });
+      return res.list.map(r => ({
+        t: Math.floor(+r[0] / 1000) + shift,
+        o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5],
+      })).reverse();          // Bybit отдаёт от новых к старым
+    }
+    const iv = { '1': '1m', '5': '5m', '15': '15m', '60': '1h', '240': '4h', D: '1d' }[interval] || interval;
+    const rows = await this._bn('/fapi/v1/klines', { symbol, interval: iv, limit });
+    return rows.map(r => ({
       t: Math.floor(+r[0] / 1000) + shift,
       o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5],
-    })).reverse();
+    }));
   },
 
-  // история открытого интереса (новые первыми), 15-мин интервалы
+  // история открытого интереса (новые первыми), 15-минутные точки
   async oiHistory(symbol, limit = 17) {
-    const res = await this.get('/v5/market/open-interest', { category: 'linear', symbol, intervalTime: '15min', limit });
-    return res.list.map(r => ({ t: +r.timestamp, oi: +r.openInterest }));
+    if (this.ex === 'bybit') {
+      const res = await this._bb('/v5/market/open-interest', { category: 'linear', symbol, intervalTime: '15min', limit });
+      return res.list.map(r => ({ t: +r.timestamp, oi: +r.openInterest }));
+    }
+    const rows = await this._bn('/futures/data/openInterestHist', { symbol, period: '15m', limit });
+    return rows.map(r => ({ t: +r.timestamp, oi: +r.sumOpenInterest })).reverse();   // Binance: от старых к новым
   },
 
-  // соотношение лонг/шорт аккаунтов
+  // соотношение лонг/шорт аккаунтов: { buy, sell } (доли)
   async accountRatio(symbol) {
-    const res = await this.get('/v5/market/account-ratio', { category: 'linear', symbol, period: '15min', limit: 1 });
-    const r = res.list && res.list[0];
-    return r ? { buy: +r.buyRatio, sell: +r.sellRatio } : null;
+    if (this.ex === 'bybit') {
+      const res = await this._bb('/v5/market/account-ratio', { category: 'linear', symbol, period: '15min', limit: 1 });
+      const r = res.list && res.list[0];
+      return r ? { buy: +r.buyRatio, sell: +r.sellRatio } : null;
+    }
+    const rows = await this._bn('/futures/data/globalLongShortAccountRatio', { symbol, period: '15m', limit: 1 });
+    const r = rows && rows[0];
+    return r ? { buy: +r.longAccount, sell: +r.shortAccount } : null;
   },
 
-  // стакан: реальные лимитные ордера
+  // стакан: реальные лимитные ордера в форме { b: [[цена, объём]...], a: [...] }
   async orderbook(symbol) {
-    return await this.get('/v5/market/orderbook', { category: 'linear', symbol, limit: 200 });
+    if (this.ex === 'bybit') return await this._bb('/v5/market/orderbook', { category: 'linear', symbol, limit: 200 });
+    const d = await this._bn('/fapi/v1/depth', { symbol, limit: 500 });
+    return { b: d.bids, a: d.asks };
   },
 };
 
 </script>
 <script>
-/* Реальные биржевые метрики Bybit: открытый интерес, long/short, стены лимиток в стакане.
+/* Реальные биржевые метрики (Bybit или Binance, смотря что выбрано в API.ex): открытый интерес,
+   long/short, стены лимиток в стакане.
    Важно: стакан показывает лимитные ордера, а не стопы — стопы не видит никто. */
 const Metrics = (() => {
-  const cache = new Map(); // sym -> {ts, data}
+  const cache = new Map(); // 'биржа:монета' -> {ts, data}
   const TTL = 60000;
   const MAX = 60;          // чтобы карта не росла бесконечно за длинную сессию
 
@@ -1148,7 +1248,8 @@ const Metrics = (() => {
   }
 
   async function get(sym, funding = null) {
-    const hit = cache.get(sym);
+    const key = `${API.ex}:${sym}`;   // у двух бирж разные стаканы и интерес: кэш не смешиваем
+    const hit = cache.get(key);
     if (hit && Date.now() - hit.ts < TTL) {
       if (funding != null) hit.data.funding = funding;
       return hit.data;
@@ -1168,8 +1269,8 @@ const Metrics = (() => {
     if (ob.status === 'fulfilled' && ob.value && ob.value.b?.length && ob.value.a?.length) {
       data.walls = findWalls(ob.value);
     }
-    cache.delete(sym);
-    cache.set(sym, { ts: Date.now(), data });
+    cache.delete(key);
+    cache.set(key, { ts: Date.now(), data });
     while (cache.size > MAX) cache.delete(cache.keys().next().value);
     return data;
   }
@@ -2301,7 +2402,8 @@ class DrawTools {
     // округляем до точности графика: у уровня с графика цена сырая, с 16 знаками,
     // и на дешёвых монетах нагрузка не влезла бы в лимит Telegram в 64 символа
     const px = +Number(price).toFixed(this.cv.precision || 8);
-    const raw = `${sym}|${px}|${dir}|${this._alertTf()}`;
+    // пятое поле - биржа: бот сторожит цену на той бирже, где смотрим монету (без него - Bybit, как раньше)
+    const raw = `${sym}|${px}|${dir}|${this._alertTf()}` + (API.ex === 'binance' ? '|bn' : '');
     const payload = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     if (payload.length > 64) { this._toast('Слишком длинная цена'); return; }
     const url = `https://t.me/${ALERT_BOT}?start=${payload}`;
@@ -2355,7 +2457,7 @@ class DrawTools {
   _alertFill() {
     const box = this.alertEl, last = this._lastPrice(), f = v => v.toFixed(this.cv.precision || 2);
     box.querySelector('.al-info').innerHTML =
-      `<b>${this._alertSymbol() || '—'}</b> · ${this._alertTf()}<br>Цена сейчас: <b>${last ? f(last) : '—'}</b>`;
+      `<b>${this._alertSymbol() || '—'}</b> · ${this._alertTf()} · ${API.exName}<br>Цена сейчас: <b>${last ? f(last) : '—'}</b>`;
     const inp = box.querySelector('.al-price');
     if (!inp.value && last && document.activeElement !== inp) inp.value = f(last);
     this._alertDir();
@@ -4450,15 +4552,18 @@ const Keys = (() => {
 
 </script>
 <script>
-/* SMC-скринер: рейтинг волатильных монет Bybit + авторазметка Smart Money на шести
-   таймфреймах (1M / 5M / 15M / 1H / 4H / 1D), поиск и избранное, инструменты рисования. */
+/* SMC-скринер: рейтинг волатильных USDT-фьючерсов (Bybit или Binance, выбирается вкладками в шапке)
+   + авторазметка Smart Money на шести таймфреймах (1M / 5M / 15M / 1H / 4H / 1D), поиск и избранное,
+   инструменты рисования. */
 const $ = s => document.querySelector(s);
 
 const state = {
   mode: 'm15',
   symbol: null,
   top: [],
-  all: [],        // все USDT-тикеры Bybit — для поиска любой монеты, не только топа
+  all: [],        // все USDT-тикеры выбранной биржи — для поиска любой монеты, не только топа
+  wantSymbol: null, // монета, которую хотим сохранить при смене биржи
+  rankError: '',  // текст ошибки, если рейтинг не загрузился (в сайдбаре вместо вечной «Загрузки…»)
   n: 10,
   minTurnover: 100e6,
   busy: false,
@@ -4479,6 +4584,9 @@ function lsGet(key, fallback) {
 function lsSet(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
 }
+
+// выбранная биржа запоминается между запусками
+API.setExchange(lsGet('smc_exchange', 'bybit'));
 
 /* ---------- избранное (закреплённые монеты) ---------- */
 const FAVS_KEY = 'smc_favs';
@@ -4547,7 +4655,7 @@ const LAYERS = Object.assign(
 );
 function saveLayers() { lsSet('smc_layers', LAYERS); }
 
-/* limit 1000 — максимум Bybit за запрос: 1M ≈ 16 ч истории, 15M ≈ 10 дней, 4H ≈ 5 месяцев,
+/* limit 1000 — максимум Bybit за запрос (у Binance до 1500): 1M ≈ 16 ч истории, 15M ≈ 10 дней, 4H ≈ 5 месяцев,
    1D — всё, что есть у монеты. bands (премиум/дисконт) рисуем на старших ТФ, extremes
    (хай/лой окна) — на младших, где нужна ближняя цель. */
 const TF_CFG = {
@@ -4561,7 +4669,7 @@ const TF_CFG = {
 const TF_ORDER = ['m1', 'm5', 'm15', 'h1', 'h4', 'd1'];  // порядок в выпадашке, от младшего к старшему
 
 /* ---------- форматирование ---------- */
-const fmtUsd = v => v >= 1e9 ? '$' + (v / 1e9).toFixed(1) + 'B'
+const fmtUsd = v => !Number.isFinite(v) ? '—' : v >= 1e9 ? '$' + (v / 1e9).toFixed(1) + 'B'
   : v >= 1e6 ? '$' + (v / 1e6).toFixed(0) + 'M'
   : '$' + (v / 1e3).toFixed(0) + 'K';
 const fmtPct = v => (v > 0 ? '+' : '') + v.toFixed(1) + '%';
@@ -4575,7 +4683,7 @@ const fmtPrice = (v) => {
 const klineCache = new Map();
 const KLINE_CACHE_MAX = 40;  // ~40 рядов по 1000 свечей: дальше выкидываем самые старые
 async function klines(sym, interval, limit) {
-  const key = `${sym}:${interval}`;
+  const key = `${API.ex}:${sym}:${interval}`;   // у двух бирж цены чуть разные: кэш не смешиваем
   const hit = klineCache.get(key);
   if (hit && Date.now() - hit.ts < 25000 && hit.data.length >= limit * 0.9) return hit.data;
   const data = await API.klines(sym, interval, limit);
@@ -4766,8 +4874,10 @@ function tfSummary(cs, A, label, minPerBar, m) {
 
 /* ---------- рейтинг ---------- */
 async function loadRanking() {
+  const ex = API.ex;
   try {
     const list = await API.tickers();
+    if (API.ex !== ex) return;          // пока грузили, переключили биржу: этот ответ уже чужой
     const rows = list
       .filter(t => t.symbol.endsWith('USDT'))
       .map(t => ({
@@ -4777,24 +4887,58 @@ async function loadRanking() {
         vol: (+t.highPrice24h - +t.lowPrice24h) / (+t.lastPrice || 1) * 100,
         to: +t.turnover24h,
         fr: +t.fundingRate,
-        oiv: +t.openInterestValue,
+        // у Binance открытый интерес в общем списке не приходит: NaN, значение дотянет fetchOpenInterest
+        oiv: t.openInterestValue == null ? NaN : +t.openInterestValue,
         chips: null,
       }))
       .filter(r => r.vol > 0 && isFinite(r.vol));
     rows.forEach(r => { r.score = r.vol * Math.log10(Math.max(10, r.to)); });
     rows.sort((a, b) => b.score - a.score);
     // все монеты держим для поиска и избранного, в топ идут только «живые» по обороту
-    const prev = new Map(state.all.map(r => [r.sym, r.chips]));
-    rows.forEach(r => { r.chips = prev.has(r.sym) ? prev.get(r.sym) : null; });
+    const prev = new Map(state.all.map(r => [r.sym, r]));
+    rows.forEach(r => {
+      const p = prev.get(r.sym);
+      r.chips = p ? p.chips : null;
+      if (!Number.isFinite(r.oiv) && p && Number.isFinite(p.oiv)) r.oiv = p.oiv;   // не мигаем прочерком при каждом обновлении
+    });
     state.all = rows;
     state.top = rows.filter(r => r.to >= state.minTurnover).slice(0, state.n);
+    state.rankError = '';
     renderSidebar();
     setStatus('обновлено ' + new Date().toLocaleTimeString());
-    if (!state.symbol && state.top.length) selectSymbol(state.top[0].sym);
+    if (!state.symbol && state.top.length) {
+      // после смены биржи пробуем оставить ту же монету, если она там есть
+      const keep = state.wantSymbol && rows.find(r => r.sym === state.wantSymbol);
+      selectSymbol(keep ? keep.sym : state.top[0].sym);
+    }
+    state.wantSymbol = null;
     fetchBadges();
+    fetchOpenInterest();
   } catch (e) {
+    if (API.ex !== ex) return;
+    state.rankError = e.message;
     setStatus('ошибка: ' + e.message, true);
+    if (!state.all.length) renderSidebar();
   }
+}
+
+// У Binance открытого интереса нет в общем списке тикеров: дотягиваем для монет, что видны в сайдбаре
+async function fetchOpenInterest() {
+  if (API.ex !== 'binance') return;
+  const ex = API.ex, rows = sidebarRows().slice(0, 12);
+  let i = 0;
+  const worker = async () => {
+    while (i < rows.length) {
+      const r = rows[i++];
+      try {
+        const v = await API.openInterestUsd(r.sym, r.last);
+        if (API.ex !== ex) return;
+        r.oiv = v;
+      } catch (e) { /* одна монета не ответила - остальные не ждут */ }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  if (API.ex === ex) renderSidebar();
 }
 
 // какие монеты показываем в сайдбаре: избранные сверху, затем топ по волатильности,
@@ -4813,7 +4957,9 @@ function sidebarRows() {
 }
 
 async function fetchBadges() {
+  const ex = API.ex;
   for (const r of sidebarRows().slice(0, 12)) {
+    if (API.ex !== ex) return;            // биржу переключили: чужие данные в сайдбар не кладём
     try {
       const cs = await klines(r.sym, '1', 240);
       const A = SMC.analyze(cs, { sweepLb: 60, knifeLb: 60, consolWin: 30 });
@@ -4830,8 +4976,9 @@ async function fetchBadges() {
       if (kn && last - kn.i <= 30) chips.push({ t: 'нож', c: 'blue' });
       const ev = A.events[A.events.length - 1];
       if (ev && ev.type === 'CHOCH' && last - ev.at <= 40) chips.push({ t: 'ЧоЧ', c: 'orange' });
+      if (API.ex !== ex) return;
       r.chips = chips;
-    } catch (e) { r.chips = []; }
+    } catch (e) { if (API.ex !== ex) return; r.chips = []; }
   }
   renderSidebar();
 }
@@ -4842,6 +4989,7 @@ function renderSidebar() {
   if (!rows.length) {
     const msg = state.search ? 'Ничего не найдено'
       : state.all.length ? 'Под фильтр оборота никто не подходит — снизь порог'
+      : state.rankError ? 'Не удалось загрузить: ' + state.rankError
       : 'Загрузка…';
     el.innerHTML = `<div class="sb-empty">${msg}</div>`;
     return;
@@ -4877,25 +5025,69 @@ function selectSymbol(sym) {
   state.symbol = sym;
   renderSidebar();
   $('#curSym').textContent = sym;
-  $('#lnkTV').href = `https://www.tradingview.com/chart/?symbol=BYBIT%3A${sym}.P`;
-  // ref=VLEK85 — реферальный код Даниила: если Bybit учтёт переход по торговой
-  // странице, партнёрка засчитается; отдельная ссылка на регистрацию — в подвале
-  $('#lnkBB').href = `https://www.bybit.com/trade/usdt/${sym}?ref=VLEK85`;
+  exchangeLinks();
   refreshCharts(true);
+}
+
+// ссылки «TradingView» и «на биржу» под выбранную монету и биржу
+function exchangeLinks() {
+  const sym = state.symbol;
+  if (!sym) return;
+  if (API.ex === 'binance') {
+    $('#lnkTV').href = `https://www.tradingview.com/chart/?symbol=BINANCE%3A${sym}.P`;
+    $('#lnkBB').href = `https://www.binance.com/en/futures/${sym}`;
+  } else {
+    $('#lnkTV').href = `https://www.tradingview.com/chart/?symbol=BYBIT%3A${sym}.P`;
+    // ref=VLEK85 — реферальный код Даниила: если Bybit учтёт переход по торговой
+    // странице, партнёрка засчитается; отдельная ссылка на регистрацию — в подвале
+    $('#lnkBB').href = `https://www.bybit.com/trade/usdt/${sym}?ref=VLEK85`;
+  }
+  $('#lnkBB').textContent = '↗ ' + API.exName;
+}
+
+/* Вкладки «Bybit | Binance». Всё, что привязано к бирже (рейтинг, свечи, метрики, разметка сайдбара),
+   сбрасывается; монету пробуем оставить ту же, если она есть на новой бирже. */
+function setExchange(id) {
+  if (!EXCHANGES[id] || id === API.ex) return;
+  if (typeof Shot !== 'undefined') Shot.reset();
+  API.setExchange(id);
+  lsSet('smc_exchange', id);
+  state.wantSymbol = state.symbol || state.wantSymbol;
+  state.symbol = null;
+  state.all = []; state.top = []; state.rankError = '';
+  klineCache.clear();
+  exchangeUi();
+  renderSidebar();
+  renderSummary([]);
+  setStatus('загружаю ' + API.exName + '…');
+  loadRanking();
+}
+
+// подписи, вкладки и заголовок страницы под текущую биржу
+function exchangeUi() {
+  document.querySelectorAll('.expick [data-ex]').forEach(b => {
+    const on = b.dataset.ex === API.ex;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  const sub = $('#brandSub');
+  if (sub) sub.textContent = API.exName + ' Futures';
+  document.title = 'SMC-скринер · ' + API.exName + ' Futures';
+  exchangeLinks();
 }
 
 /* Живая цена: раз в 2 секунды тянем только последние свечи и дописываем их в
    график. Разметку и метрики не трогаем — они пересчитываются раз в 25 секунд. */
 async function liveTick() {
   if (!state.symbol || state.busy || state.liveBusy) return;
-  const mode = state.mode, sym = state.symbol;
+  const mode = state.mode, sym = state.symbol, ex = API.ex;
   const cv = charts[(CHART_SLOTS[mode] || [])[0]];
   if (!cv || !cv.candles || !cv.el.clientWidth || document.hidden) return;
   state.liveBusy = true;
   try {
     // мимо кэша свечей: он отдаёт данные 25-секундной давности
     const cs = await API.klines(sym, TF_CFG[mode].interval, 3);
-    if (state.symbol === sym && state.mode === mode) cv.pushLast(cs);
+    if (state.symbol === sym && state.mode === mode && API.ex === ex) cv.pushLast(cs);
   } catch (e) {
     /* сеть моргнула — следующий тик через 2 секунды */
   } finally {
@@ -4907,9 +5099,9 @@ async function refreshCharts(fit = false) {
   if (!state.symbol) return;
   if (state.busy) { state.queued = state.queued || fit; return; }
   state.busy = true;
-  const sym = state.symbol, mode = state.mode;
+  const sym = state.symbol, mode = state.mode, ex = API.ex;
   const stale = () => {
-    if (state.symbol === sym && state.mode === mode) return false;
+    if (state.symbol === sym && state.mode === mode && API.ex === ex) return false;
     state.queued = true;
     return true;
   };
@@ -4928,7 +5120,7 @@ async function refreshCharts(fit = false) {
       // на дневках время на оси не нужно — только даты
       cv.chart.applyOptions({ timeScale: { timeVisible: cfg.minPerBar < 1440 } });
       cv.setPrecision(price);
-      cv.setTitle(`${sym} · ${cfg.label}`);
+      cv.setTitle(`${sym} · ${cfg.label} · ${API.exName}`);
       cv.setData(cs, { fit });
       const d = buildDrawings(cs, A, { bands: cfg.bands, maxOB: 3, maxFVG: 4, maxEvents: 6, extremes: cfg.extremes });
       d.hlines.push(...wallLines(m));
@@ -4990,6 +5182,8 @@ function tfMenu(open) {
 
 document.addEventListener('DOMContentLoaded', () => {
   ensureChart(state.mode);  // остальные ТФ создадутся при первом открытии их вкладки
+  exchangeUi();
+  document.querySelectorAll('.expick [data-ex]').forEach(b => b.addEventListener('click', () => setExchange(b.dataset.ex)));
 
   $('#sidebar').addEventListener('click', e => {
     const star = e.target.closest('[data-fav]');
