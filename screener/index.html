@@ -7,7 +7,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>SMC-скринер · Bybit Futures</title>
+<title>SMC-скринер · Binance Futures</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 * { box-sizing: border-box; }
@@ -1020,10 +1020,10 @@ footer {
 </head>
 <body>
 <header>
-  <div class="brand">SMC-скринер <span class="sub" id="brandSub">Bybit Futures</span></div>
+  <div class="brand">SMC-скринер <span class="sub" id="brandSub">Binance Futures</span></div>
   <div class="expick" role="tablist" aria-label="Биржа (фьючерсы)">
-    <button type="button" role="tab" data-ex="bybit" class="on" aria-selected="true">Bybit</button>
-    <button type="button" role="tab" data-ex="binance" aria-selected="false">Binance</button>
+    <button type="button" role="tab" data-ex="bybit" aria-selected="false">Bybit</button>
+    <button type="button" role="tab" data-ex="binance" class="on" aria-selected="true">Binance</button>
   </div>
   <div class="hdrbtns">
     <nav class="tfpick">
@@ -1082,7 +1082,7 @@ footer {
     <div id="symbolBar">
       <b id="curSym">—</b>
       <a id="lnkTV" target="_blank" rel="noopener">↗ TradingView</a>
-      <a id="lnkBB" target="_blank" rel="noopener">↗ Bybit</a>
+      <a id="lnkBB" target="_blank" rel="noopener">↗ Binance</a>
     </div>
     <div id="layerBar"></div>
     <div id="summary"></div>
@@ -1118,14 +1118,17 @@ footer {
 /* Биржевые API для USDT-фьючерсов: Bybit v5 и Binance USDⓈ-M.
    Наружу обе отдают ОДИНАКОВУЮ форму данных (нормализация внутри), поэтому остальной код не знает,
    с какой биржей говорит. Локально запросы идут через server.py (прокси), в облаке (GitHub Pages,
-   Telegram) - напрямую: у обеих бирж CORS открыт. Текущая биржа: API.ex ('bybit' | 'binance'). */
+   Telegram) - напрямую: у обеих бирж CORS открыт. Текущая биржа: API.ex ('bybit' | 'binance'), по умолчанию Binance. */
 const EXCHANGES = {
   bybit:   { id: 'bybit',   name: 'Bybit',   local: '/bybit',   cloud: 'https://api.bybit.com' },
   binance: { id: 'binance', name: 'Binance', local: '/binance', cloud: 'https://fapi.binance.com' },
 };
 
+// биржа по умолчанию, пока человек не выбрал другую вкладкой (выбор запоминается)
+const DEFAULT_EXCHANGE = 'binance';
+
 const API = {
-  ex: 'bybit',
+  ex: DEFAULT_EXCHANGE,
 
   setExchange(id) { if (EXCHANGES[id]) this.ex = id; },
   get exName() { return EXCHANGES[this.ex].name; },
@@ -4612,7 +4615,7 @@ function lsSet(key, value) {
 }
 
 // выбранная биржа запоминается между запусками
-API.setExchange(lsGet('smc_exchange', 'bybit'));
+API.setExchange(lsGet('smc_exchange', DEFAULT_EXCHANGE));
 
 /* ---------- избранное (закреплённые монеты) ---------- */
 const FAVS_KEY = 'smc_favs';
